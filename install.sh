@@ -48,4 +48,4 @@ echo -e "  ${GREEN}✓${NC} 설치 완료"
 cd "${PROJECT_DIR}"
 echo ""
 
-exec bash "${INSTALL_DIR}/setup.sh"
+exec bash "${INSTALL_DIR}/setup.sh" < /dev/tty
