@@ -12,6 +12,11 @@
 
 set -e
 
+# curl | bash 로 실행 시 stdin이 파이프이므로 터미널로 복원
+if [ ! -t 0 ]; then
+    exec < /dev/tty
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/config.yaml"
 ENV_FILE="${SCRIPT_DIR}/.env"
