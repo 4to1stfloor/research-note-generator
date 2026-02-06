@@ -12,18 +12,21 @@
 - **유휴 감지**: N일간 변경 없으면 자동 중단, 변경 시 자동 재개
 - **다중 프로젝트**: config에 여러 프로젝트 등록 가능
 
-## Quick Start (명령어 3줄이면 끝)
+## Quick Start
+
+내 프로젝트 폴더에서 이 한 줄만 실행하면 끝:
 
 ```bash
-git clone https://github.com/4to1stfloor/research-note-generator.git
-cd my_project                              # 내 프로젝트 폴더로 이동
-bash ../research-note-generator/setup.sh   # setup 실행
+cd my_project
+curl -fsSL https://raw.githubusercontent.com/4to1stfloor/research-note-generator/main/install.sh | bash
 ```
 
-**현재 폴더가 자동으로 프로젝트로 등록됩니다.** 별도 경로 입력 불필요.
+`git clone`, `pip install` 등 **전부 자동**으로 처리됩니다.
 
-`setup.sh`가 자동으로:
-- 현재 폴더의 파일 유형 감지 (.py, .R, .js 등)
+자동으로 되는 것:
+- 도구 설치 (`~/.research-note-generator/`)
+- 현재 폴더를 프로젝트로 자동 등록
+- 파일 유형 자동 감지 (.py, .R, .js 등)
 - Git 저장소 여부 자동 판별
 - Python/PyYAML 설치 확인
 - 이메일 알림 설정 (선택)
