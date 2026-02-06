@@ -1,0 +1,12 @@
+# State & runtime
+.state/
+logs/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,108 @@
+# Research Note Generator Configuration
+# ======================================
+
+# General settings
+general:
+  timezone: "Asia/Seoul"
+  language: "ko"
+
+  # AI backend for summarization
+  # "auto"          → 자동 감지: claude_cli → ollama → none (권장)
+  # "claude_cli"    → Claude Code CLI (구독 필요)
+  # "anthropic_api" → Anthropic API (ANTHROPIC_API_KEY 환경변수 필요)
+  # "ollama"        → Local LLM via Ollama (무료, 로컬 설치 필요)
+  # "none"          → AI 없이 구조화된 템플릿만 사용
+  ai_backend: "auto"
+
+  # Ollama settings (ai_backend: "ollama" 또는 "auto" fallback 시 사용)
+  ollama:
+    model: "llama3.1:8b"     # 사용할 모델 (ollama pull 필요)
+    # 추천 모델:
+    #   llama3.1:8b     - 범용, 한국어 OK, ~5GB
+    #   llama3.2:3b     - 가볍고 빠름, CI용, ~2GB
+    #   gemma2:9b       - 코드 분석 우수, ~6GB
+    #   qwen2.5:7b      - 한국어 우수, ~5GB
+
+# Projects to monitor
+# 모니터링할 프로젝트를 등록하세요. 여러 프로젝트를 등록할 수 있습니다.
+projects:
+  - name: "my_project"
+    path: "./my_project"              # 프로젝트 경로 (절대/상대)
+    detection: "mtime"                # "git" | "mtime" | "auto"
+    include_patterns:
+      - "**/*.py"
+      - "**/*.R"
+      - "**/*.yaml"
+      - "**/*.yml"
+      - "**/*.sh"
+    exclude_patterns:
+      - "**/__pycache__/**"
+      - "**/.git/**"
+      - "**/*.pyc"
+      - "**/results/**"
+      - "**/logs/**"
+      - "**/daily/**"
+    note_output: "./my_project/RESEARCH_NOTE.md"
+    daily_dir: "./my_project/daily"
+
+  # 프로젝트 추가 예시:
+  # - name: "another_project"
+  #   path: "/absolute/path/to/project"
+  #   detection: "git"
+  #   include_patterns: ["**/*.py", "**/*.ipynb"]
+  #   exclude_patterns: ["**/__pycache__/**", "**/.git/**"]
+  #   note_output: "/absolute/path/to/project/RESEARCH_NOTE.md"
+  #   daily_dir: "/absolute/path/to/project/daily"
+
+# Note generation settings
+note:
+  daily_template: "./templates/daily_entry.md"
+  initial_template: "./templates/initial_note.md"
+  max_detailed_files: 20
+  include_diffs: true
+  max_diff_lines: 50
+
+# ============================================================
+# Notification settings
+# ============================================================
+notification:
+  enabled: false              # true로 변경하여 알림 활성화
+
+  # Schedule: "daily" | "weekly"
+  schedule: "daily"
+
+  # Weekly settings (schedule: "weekly" 일 때)
+  weekly:
+    send_day: "monday"
+    ai_summary: true
+
+  # Email (SMTP)
+  email:
+    enabled: false            # true로 변경하여 이메일 활성화
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    use_tls: true
+    sender_env: "SMTP_SENDER"       # .env 파일의 환경변수 이름
+    password_env: "SMTP_PASSWORD"   # .env 파일의 환경변수 이름
+    recipients:
+      - "your-email@gmail.com"      # 수신자 이메일 주소
+
+  # Slack (Bot Token → DM)
+  slack:
+    enabled: false
+    bot_token_env: "SLACK_BOT_TOKEN"
+    recipients:
+      - "U0123456789"               # Slack User ID
+
+# ============================================================
+# Idle detection (자동 중단)
+# ============================================================
+idle:
+  enabled: true
+  pause_after_days: 7          # N일간 변경 없으면 자동 중단
+  notify_on_pause: true        # 중단 시 알림 보낼지
+  auto_resume: true            # 중단 후 변경 감지되면 자동 재개
+
+# State tracking
+state:
+  state_dir: "./.state"
