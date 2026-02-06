@@ -182,67 +182,79 @@ if [ -f "${ENV_FILE}" ]; then
 fi
 
 echo "  연구노트를 이메일로 받아볼 수 있습니다."
-echo "  (Gmail, Naver 등 본인 이메일 주소 입력)"
 echo ""
-read -p "  이메일 주소 (건너뛰려면 Enter): " EMAIL_INPUT
+read -p "  수신 이메일 (받을 주소, 건너뛰려면 Enter): " EMAIL_RECIPIENT
 
-if [ -n "$EMAIL_INPUT" ]; then
-    EMAIL_RECIPIENT="$EMAIL_INPUT"
+if [ -n "$EMAIL_RECIPIENT" ]; then
     EMAIL_ENABLED="true"
     NOTIF_ENABLED="true"
+    ok "수신: ${EMAIL_RECIPIENT}"
 
     if [ "$HAS_CREDENTIALS" = "true" ]; then
-        ok "수신: ${EMAIL_RECIPIENT}"
         ok "발신: ${SMTP_SENDER} (기존 설정 사용)"
     else
-        # Use entered email as sender too (most common case)
-        SMTP_SENDER="$EMAIL_INPUT"
         echo ""
-        echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "  ${BOLD}Gmail 앱 비밀번호 만들기${NC} (처음 한 번만, 2분 소요)"
-        echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        echo "  이메일을 보내려면 Gmail '앱 비밀번호'가 필요합니다."
-        echo "  일반 비밀번호가 아닌 별도 비밀번호입니다."
-        echo ""
-        echo -e "  ${BOLD}[Step 1]${NC} 아래 링크를 브라우저에서 열어주세요:"
-        echo ""
-        echo -e "    ${CYAN}https://myaccount.google.com/security${NC}"
-        echo ""
-        echo -e "  ${BOLD}[Step 2]${NC} '2단계 인증'이 켜져 있는지 확인"
-        echo "    → 꺼져 있으면 먼저 켜주세요 (필수)"
-        echo ""
-        echo -e "  ${BOLD}[Step 3]${NC} 아래 링크에서 앱 비밀번호 생성:"
-        echo ""
-        echo -e "    ${CYAN}https://myaccount.google.com/apppasswords${NC}"
-        echo ""
-        echo "    → 앱 이름에 아무거나 입력 (예: research-note)"
-        echo "    → '만들기' 클릭"
-        echo ""
-        echo -e "  ${BOLD}[Step 4]${NC} 화면에 나오는 ${BOLD}16자리 비밀번호${NC}를 복사"
-        echo "    → 예시: ${CYAN}abcd efgh ijkl mnop${NC}"
-        echo "    → 이 비밀번호는 다시 볼 수 없으니 바로 아래에 붙여넣기!"
-        echo ""
-        echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-        read -p "  앱 비밀번호 (16자리 붙여넣기): " SMTP_PASSWORD
+        read -p "  발신 Gmail (보낼 주소): " SMTP_SENDER
 
-        if [ -n "$SMTP_PASSWORD" ]; then
-            cat > "${ENV_FILE}" << ENVEOF
-SMTP_SENDER="${SMTP_SENDER}"
-SMTP_PASSWORD="${SMTP_PASSWORD}"
-ENVEOF
-            chmod 600 "${ENV_FILE}"
-            echo ""
-            ok "이메일 설정 완료!"
-            ok "발신/수신: ${EMAIL_RECIPIENT}"
-            info "비밀번호는 .env 파일에 안전하게 저장됨 (git 제외)"
-        else
-            warn "앱 비밀번호 미입력 → 이메일 알림 건너뜀"
-            warn "나중에 설정하려면: cp .env.example .env 후 편집"
+        if [ -z "$SMTP_SENDER" ]; then
+            warn "발신 이메일 미입력 → 이메일 알림 건너뜀"
             EMAIL_ENABLED="false"
             NOTIF_ENABLED="false"
             EMAIL_RECIPIENT=""
+        else
+            ok "발신: ${SMTP_SENDER}"
+            echo ""
+            echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo -e "  ${BOLD}  ${SMTP_SENDER} 의 앱 비밀번호 만들기${NC}"
+            echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo ""
+            echo "  이메일 발송을 위해 Gmail '앱 비밀번호'가 필요합니다."
+            echo "  (Gmail 일반 비밀번호가 아닌, 앱 전용 비밀번호입니다)"
+            echo "  (처음 한 번만 만들면 됩니다)"
+            echo ""
+            echo -e "  ${BOLD}[Step 1]${NC} ${SMTP_SENDER} 으로 Google에 로그인한 상태에서"
+            echo -e "          아래 링크를 브라우저에서 열어주세요:"
+            echo ""
+            echo -e "          ${CYAN}https://myaccount.google.com/security${NC}"
+            echo ""
+            echo -e "  ${BOLD}[Step 2]${NC} 페이지에서 ${BOLD}'2단계 인증'${NC} 항목을 찾아주세요."
+            echo "          → '사용'으로 되어 있으면 OK, 다음 단계로"
+            echo "          → '사용 안함'이면 클릭해서 먼저 활성화해주세요"
+            echo ""
+            echo -e "  ${BOLD}[Step 3]${NC} 2단계 인증이 켜졌으면, 아래 링크로 이동:"
+            echo ""
+            echo -e "          ${CYAN}https://myaccount.google.com/apppasswords${NC}"
+            echo ""
+            echo "          → 앱 이름에 아무거나 입력 (예: ${CYAN}research-note${NC})"
+            echo "          → ${BOLD}'만들기'${NC} 버튼 클릭"
+            echo ""
+            echo -e "  ${BOLD}[Step 4]${NC} 화면에 나오는 ${BOLD}16자리 비밀번호${NC}를 복사해주세요."
+            echo "          (예: ${CYAN}abcd efgh ijkl mnop${NC})"
+            echo ""
+            echo -e "          ${RED}이 비밀번호는 창을 닫으면 다시 볼 수 없습니다!${NC}"
+            echo "          복사한 뒤 바로 아래에 붙여넣기 해주세요."
+            echo ""
+            echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+            echo ""
+            read -p "  앱 비밀번호 붙여넣기: " SMTP_PASSWORD
+
+            if [ -n "$SMTP_PASSWORD" ]; then
+                cat > "${ENV_FILE}" << ENVEOF
+SMTP_SENDER="${SMTP_SENDER}"
+SMTP_PASSWORD="${SMTP_PASSWORD}"
+ENVEOF
+                chmod 600 "${ENV_FILE}"
+                echo ""
+                ok "이메일 설정 완료!"
+                ok "발신: ${SMTP_SENDER} → 수신: ${EMAIL_RECIPIENT}"
+                info "앱 비밀번호는 .env 파일에 저장됨 (git에 포함 안 됨)"
+            else
+                warn "앱 비밀번호 미입력 → 이메일 알림 건너뜀"
+                warn "나중에 설정: cp .env.example .env 후 편집"
+                EMAIL_ENABLED="false"
+                NOTIF_ENABLED="false"
+                EMAIL_RECIPIENT=""
+            fi
         fi
     fi
 else
