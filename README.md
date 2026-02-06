@@ -12,12 +12,29 @@
 - **유휴 감지**: N일간 변경 없으면 자동 중단, 변경 시 자동 재개
 - **다중 프로젝트**: config에 여러 프로젝트 등록 가능
 
-## Quick Start
+## Quick Start (초보자용 - 명령어 2줄이면 끝)
+
+```bash
+git clone https://github.com/4to1stfloor/research-note-generator.git
+cd research-note-generator
+bash setup.sh
+```
+
+`setup.sh`가 질문을 통해 모든 설정을 자동으로 해줍니다:
+- Python/PyYAML 설치 확인
+- 프로젝트 경로 & 파일 유형 설정
+- 이메일 알림 설정 (선택)
+- RESEARCH_NOTE.md 자동 생성
+- 매일 자동 실행 설정 (선택)
+
+---
+
+## Manual Setup (직접 설정하기)
 
 ### 1. 클론 & 설치
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/research-note-generator.git
+git clone https://github.com/4to1stfloor/research-note-generator.git
 cd research-note-generator
 pip install pyyaml
 ```
@@ -179,6 +196,7 @@ Daily Log (날짜별 자동 엔트리)
 
 ```
 research-note-generator/
+├── setup.sh                   # 초보자용 설정 마법사
 ├── generate_note.py           # 메인 스크립트
 ├── config.yaml                # 설정 파일
 ├── .env.example               # 환경변수 템플릿
@@ -189,7 +207,7 @@ research-note-generator/
 │   ├── initial_note.md        # 초기 노트 템플릿
 │   └── daily_entry.md         # 일일 엔트리 템플릿
 ├── scripts/
-│   ├── setup_cron.sh          # Cron 설정
+│   ├── setup_cron.sh          # Cron 자동 설정
 │   └── run_cron.sh            # Cron 실행 래퍼
 └── .github/
     └── workflows/
