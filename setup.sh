@@ -409,8 +409,8 @@ $PYTHON_CMD "${SCRIPT_DIR}/generate_note.py" --project "${PROJECT_NAME}" --verbo
 echo ""
 echo -e "${BLUE}━━━ 매일 자동 실행 (선택) ━━━${NC}"
 echo ""
-read -p "  매일 자정 자동 실행? (y/N): " AUTO_RUN
-if [[ "$AUTO_RUN" =~ ^[yY] ]]; then
+read -p "  매일 자정 자동 실행? (Y/n): " AUTO_RUN
+if [[ ! "$AUTO_RUN" =~ ^[nN] ]]; then
     bash "${SCRIPT_DIR}/scripts/setup_cron.sh" install
 fi
 
