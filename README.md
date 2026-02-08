@@ -7,7 +7,7 @@
 - **자동 변경 감지**: Git diff 또는 파일 수정시간(mtime) 기반
 - **일일 연구노트**: 날짜별 자동 생성 (개별 daily 파일 + 누적 RESEARCH_NOTE.md)
 - **주간 리포트**: 7일치 daily 노트를 자동 병합 + AI 요약
-- **AI 분석 (선택)**: Claude CLI / Anthropic API / Ollama(로컬 LLM) 자동 감지
+- **AI 분석 (필수)**: Claude CLI / Anthropic API / Ollama(로컬 LLM) 자동 감지
 - **알림**: Email(Gmail SMTP) / Slack DM 자동 발송
 - **유휴 감지**: N일간 변경 없으면 자동 중단, 변경 시 자동 재개
 - **다중 프로젝트**: config에 여러 프로젝트 등록 가능
@@ -225,9 +225,10 @@ research-note-generator/
 - Python 3.8+
 - PyYAML (`pip install pyyaml`)
 - Git (git 기반 변경 감지 시)
-- (선택) Claude Code CLI
-- (선택) Ollama
-- (선택) `anthropic` Python SDK
+- **AI 백엔드 (하나 이상 필수)**:
+  - Claude Code CLI (구독 필요) — 또는
+  - Anthropic API Key (`ANTHROPIC_API_KEY` 환경변수) — 또는
+  - Ollama (로컬 LLM, 무료, `curl -fsSL https://ollama.com/install.sh | sh`)
 
 ## License
 

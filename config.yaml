@@ -6,12 +6,11 @@ general:
   timezone: "Asia/Seoul"
   language: "ko"
 
-  # AI backend for summarization
-  # "auto"          → 자동 감지: claude_cli → ollama → none (권장)
+  # AI backend for summarization (필수 - 하나 이상 설정 필요)
+  # "auto"          → 자동 감지: claude_cli → anthropic_api → ollama (권장)
   # "claude_cli"    → Claude Code CLI (구독 필요)
   # "anthropic_api" → Anthropic API (ANTHROPIC_API_KEY 환경변수 필요)
   # "ollama"        → Local LLM via Ollama (무료, 로컬 설치 필요)
-  # "none"          → AI 없이 구조화된 템플릿만 사용
   ai_backend: "auto"
 
   # Ollama settings (ai_backend: "ollama" 또는 "auto" fallback 시 사용)

@@ -94,57 +94,76 @@ class ChangeDetector:
             "date": datetime.date.today().isoformat(),
             "modified": [], "new": [], "deleted": [], "commits": [], "diffs": {}, "stats": {},
         }
+        first_run = not self.state_file.exists()
         since = self._get_last_run_date() or "yesterday"
         try:
-            r = subprocess.run(
-                ["git", "log", f"--since={since}", "--oneline", "--no-merges"],
-                cwd=self.path, capture_output=True, text=True, timeout=30
-            )
+            # First run: get ALL commits; subsequent: only since last run
+            if first_run:
+                r = subprocess.run(
+                    ["git", "log", "--oneline", "--no-merges"],
+                    cwd=self.path, capture_output=True, text=True, timeout=30
+                )
+            else:
+                r = subprocess.run(
+                    ["git", "log", f"--since={since}", "--oneline", "--no-merges"],
+                    cwd=self.path, capture_output=True, text=True, timeout=30
+                )
             if r.returncode == 0 and r.stdout.strip():
                 changes["commits"] = [l.strip() for l in r.stdout.strip().split("\n") if l.strip()]
 
-            r = subprocess.run(
-                ["git", "diff", "--name-status", "HEAD~1"],
-                cwd=self.path, capture_output=True, text=True, timeout=30
-            )
-            if r.returncode != 0 or not r.stdout.strip():
+            if first_run:
+                # First run: list ALL tracked files as "new"
                 r = subprocess.run(
-                    ["git", "diff", "--name-status"],
+                    ["git", "ls-files"],
                     cwd=self.path, capture_output=True, text=True, timeout=30
                 )
-                u = subprocess.run(
-                    ["git", "ls-files", "--others", "--exclude-standard"],
-                    cwd=self.path, capture_output=True, text=True, timeout=30
-                )
-                if u.returncode == 0 and u.stdout.strip():
-                    for f in u.stdout.strip().split("\n"):
+                if r.returncode == 0 and r.stdout.strip():
+                    for f in r.stdout.strip().split("\n"):
                         if f.strip() and self._match(f.strip()):
                             changes["new"].append(f.strip())
-
-            if r.returncode == 0 and r.stdout.strip():
-                for line in r.stdout.strip().split("\n"):
-                    if not line.strip():
-                        continue
-                    parts = line.split("\t", 1)
-                    if len(parts) < 2:
-                        continue
-                    status, fp = parts[0].strip(), parts[1].strip()
-                    if not self._match(fp):
-                        continue
-                    if status.startswith("M"):
-                        changes["modified"].append(fp)
-                    elif status.startswith("A"):
-                        changes["new"].append(fp)
-                    elif status.startswith("D"):
-                        changes["deleted"].append(fp)
-
-            for fp in changes["modified"][:20]:
-                dr = subprocess.run(
-                    ["git", "diff", "HEAD~1", "--", fp],
-                    cwd=self.path, capture_output=True, text=True, timeout=10
+            else:
+                r = subprocess.run(
+                    ["git", "diff", "--name-status", "HEAD~1"],
+                    cwd=self.path, capture_output=True, text=True, timeout=30
                 )
-                if dr.returncode == 0 and dr.stdout.strip():
-                    changes["diffs"][fp] = "\n".join(dr.stdout.strip().split("\n")[:50])
+                if r.returncode != 0 or not r.stdout.strip():
+                    r = subprocess.run(
+                        ["git", "diff", "--name-status"],
+                        cwd=self.path, capture_output=True, text=True, timeout=30
+                    )
+                    u = subprocess.run(
+                        ["git", "ls-files", "--others", "--exclude-standard"],
+                        cwd=self.path, capture_output=True, text=True, timeout=30
+                    )
+                    if u.returncode == 0 and u.stdout.strip():
+                        for f in u.stdout.strip().split("\n"):
+                            if f.strip() and self._match(f.strip()):
+                                changes["new"].append(f.strip())
+
+                if r.returncode == 0 and r.stdout.strip():
+                    for line in r.stdout.strip().split("\n"):
+                        if not line.strip():
+                            continue
+                        parts = line.split("\t", 1)
+                        if len(parts) < 2:
+                            continue
+                        status, fp = parts[0].strip(), parts[1].strip()
+                        if not self._match(fp):
+                            continue
+                        if status.startswith("M"):
+                            changes["modified"].append(fp)
+                        elif status.startswith("A"):
+                            changes["new"].append(fp)
+                        elif status.startswith("D"):
+                            changes["deleted"].append(fp)
+
+                for fp in changes["modified"][:20]:
+                    dr = subprocess.run(
+                        ["git", "diff", "HEAD~1", "--", fp],
+                        cwd=self.path, capture_output=True, text=True, timeout=10
+                    )
+                    if dr.returncode == 0 and dr.stdout.strip():
+                        changes["diffs"][fp] = "\n".join(dr.stdout.strip().split("\n")[:50])
 
             changes["stats"] = self._get_file_stats()
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
@@ -314,7 +333,8 @@ class IdleDetector:
 # ============================================================================
 
 class AIBackendDetector:
-    """Auto-detect available AI backends: claude_cli → ollama → none."""
+    """Auto-detect available AI backends: claude_cli → anthropic_api → ollama.
+    AI is REQUIRED - the tool cannot function without an AI backend."""
 
     _cache = {}  # Class-level cache for detection results
 
@@ -331,9 +351,16 @@ class AIBackendDetector:
                 cls._cache["claude_cli"] = False
             if cls._cache["claude_cli"]:
                 print("[AI] Claude CLI detected ✓")
-            else:
-                print("[AI] Claude CLI not available")
         return cls._cache["claude_cli"]
+
+    @classmethod
+    def check_anthropic_api(cls) -> bool:
+        if "anthropic_api" not in cls._cache:
+            api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+            cls._cache["anthropic_api"] = bool(api_key)
+            if cls._cache["anthropic_api"]:
+                print("[AI] Anthropic API Key detected ✓")
+        return cls._cache["anthropic_api"]
 
     @classmethod
     def check_ollama(cls) -> bool:
@@ -350,8 +377,6 @@ class AIBackendDetector:
                 cls._cache["ollama_models"] = []
             if cls._cache["ollama"]:
                 print(f"[AI] Ollama detected ✓ (models: {', '.join(cls._cache['ollama_models'][:3])})")
-            else:
-                print("[AI] Ollama not available")
         return cls._cache["ollama"]
 
     @classmethod
@@ -385,18 +410,100 @@ class AIBackendDetector:
 
     @classmethod
     def resolve(cls, configured: str, ollama_model: str = "llama3.1:8b") -> str:
-        """Resolve 'auto' to the best available backend."""
+        """Resolve 'auto' to the best available backend. Exits if none available."""
         if configured != "auto":
             return configured
 
+        # 1순위: Claude Code CLI (구독 필요)
         if cls.check_claude_cli():
             return "claude_cli"
+
+        # 2순위: Anthropic API Key
+        if cls.check_anthropic_api():
+            return "anthropic_api"
+
+        # 3순위: Ollama (로컬 LLM)
         if cls.check_ollama():
             cls.install_ollama_model(ollama_model)
             return "ollama"
 
-        print("[AI] No AI backend available → using structured mode (no AI)")
-        return "none"
+        # AI 없음 → 사용 불가
+        cls._print_no_ai_error()
+        sys.exit(1)
+
+    @classmethod
+    def _print_no_ai_error(cls):
+        """Print detailed error message when no AI backend is available."""
+        print("")
+        print("=" * 60)
+        print("[ERROR] AI 백엔드를 찾을 수 없습니다.")
+        print("=" * 60)
+        print("")
+        print("이 도구는 AI 백엔드가 필수입니다.")
+        print("아래 원인을 확인하고 하나 이상 설정해주세요:")
+        print("")
+        print("  ❌ Claude Code CLI")
+        print("     → 'claude' 명령어가 설치되지 않았거나 PATH에 없음")
+        print("     → Claude Code 구독이 필요합니다")
+        print("     → 설치: https://docs.anthropic.com/en/docs/claude-code")
+        print("")
+        print("  ❌ Anthropic API Key")
+        print("     → ANTHROPIC_API_KEY 환경변수가 설정되지 않음")
+        print("     → .env 파일에 ANTHROPIC_API_KEY=sk-... 추가")
+        print("     → API 키 발급: https://console.anthropic.com/")
+        print("")
+        print("  ❌ Ollama (로컬 LLM)")
+        # Check specific Ollama failure reasons
+        ollama_installed = False
+        try:
+            r = subprocess.run(["ollama", "--version"], capture_output=True, text=True, timeout=5)
+            ollama_installed = r.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        if not ollama_installed:
+            print("     → Ollama가 설치되지 않음")
+            print("     → 설치: curl -fsSL https://ollama.com/install.sh | sh")
+        else:
+            # Ollama installed but no models or not running
+            try:
+                req = urllib.request.Request("http://localhost:11434/api/tags")
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    data = json.loads(resp.read().decode())
+                    models = [m["name"] for m in data.get("models", [])]
+                    if not models:
+                        print("     → Ollama는 설치됐으나 모델이 없음")
+                        print("     → 모델 다운로드: ollama pull llama3.1:8b")
+                    else:
+                        print(f"     → Ollama 모델 있음({', '.join(models[:3])}) 하지만 응답 오류")
+            except urllib.error.URLError:
+                print("     → Ollama가 설치됐으나 서비스가 실행 중이지 않음")
+                print("     → 시작: ollama serve")
+            except Exception as e:
+                print(f"     → Ollama 연결 실패: {e}")
+
+        # GPU check
+        try:
+            r = subprocess.run(["nvidia-smi"], capture_output=True, text=True, timeout=5)
+            if r.returncode != 0:
+                print("")
+                print("  ⚠️  GPU (nvidia-smi) 감지 실패")
+                print("     → GPU 없이도 Ollama CPU 모드로 동작 가능 (느림)")
+                print("     → 또는 Claude CLI/API Key 사용을 권장합니다")
+        except FileNotFoundError:
+            print("")
+            print("  ⚠️  GPU 없음 (nvidia-smi not found)")
+            print("     → Ollama CPU 모드 가능하나 느릴 수 있음")
+            print("     → Claude CLI 또는 API Key 사용을 권장합니다")
+        except Exception:
+            pass
+
+        print("")
+        print("해결 방법 (하나만 선택):")
+        print("  1) Claude Code 설치 후 'claude' 명령어 사용 가능하게 설정")
+        print("  2) export ANTHROPIC_API_KEY=sk-ant-... (.env 또는 shell)")
+        print("  3) curl -fsSL https://ollama.com/install.sh | sh && ollama pull llama3.1:8b")
+        print("=" * 60)
 
 
 class NoteGenerator:
@@ -404,7 +511,7 @@ class NoteGenerator:
         self.config = config
         ollama_cfg = config.get("general", {}).get("ollama", {})
         self.ollama_model = ollama_cfg.get("model", "llama3.1:8b")
-        configured = config.get("general", {}).get("ai_backend", "none")
+        configured = config.get("general", {}).get("ai_backend", "auto")
         self.ai_backend = AIBackendDetector.resolve(configured, self.ollama_model)
         self.templates_dir = Path(__file__).parent / "templates"
 
@@ -419,73 +526,6 @@ class NoteGenerator:
             return self._generate_with_api(changes, today, day_name)
         elif self.ai_backend == "ollama":
             return self._generate_with_ollama(changes, today, day_name)
-        else:
-            return self._generate_structured(changes, today, day_name)
-
-    def _generate_structured(self, changes: dict, today, day_name: str) -> str:
-        lines = []
-        lines.append(f"\n---\n")
-        lines.append(f"# {today.isoformat()} ({day_name})\n")
-        lines.append(f"## Changes Summary\n")
-
-        total = len(changes["modified"]) + len(changes["new"]) + len(changes["deleted"])
-        if total == 0:
-            lines.append("No changes detected.\n")
-            return "\n".join(lines)
-
-        lines.append(f"**Total**: {total} files changed "
-                     f"({len(changes['new'])} new, {len(changes['modified'])} modified, "
-                     f"{len(changes['deleted'])} deleted)\n")
-
-        if changes["modified"]:
-            lines.append("### Modified Files")
-            for f in changes["modified"]:
-                lines.append(f"- `{f}`")
-            lines.append("")
-
-        if changes["new"]:
-            lines.append("### New Files")
-            for f in changes["new"]:
-                lines.append(f"- `{f}`")
-            lines.append("")
-
-        if changes["deleted"]:
-            lines.append("### Deleted Files")
-            for f in changes["deleted"]:
-                lines.append(f"- ~~`{f}`~~")
-            lines.append("")
-
-        if changes.get("commits"):
-            lines.append("## Git Commits\n")
-            for c in changes["commits"]:
-                lines.append(f"- {c}")
-            lines.append("")
-
-        if changes.get("diffs"):
-            lines.append("## Key Changes Detail\n")
-            for fp, diff in changes["diffs"].items():
-                lines.append(f"### `{fp}`")
-                lines.append("```diff")
-                lines.append(diff)
-                lines.append("```\n")
-
-        stats = changes.get("stats", {})
-        if stats:
-            lines.append("## Project Stats\n")
-            lines.append("| Metric | Value |")
-            lines.append("|--------|-------|")
-            lines.append(f"| Total Files | {stats.get('total_files', 'N/A')} |")
-            lines.append(f"| Total Lines | {stats.get('total_lines', 'N/A')} |")
-            for ext, info in sorted(stats.get("by_extension", {}).items()):
-                lines.append(f"| {ext} files | {info['files']} ({info['lines']} lines) |")
-            lines.append("")
-
-        lines.append("## Architecture Updates\n<!-- AI 분석 또는 수동 기록 -->\n")
-        lines.append("## Issues & Solutions\n<!-- 증상 → 원인 → 시도 → 해결 -->\n")
-        lines.append("## Training / Experiment Status\n<!-- 학습 상태, 메트릭 -->\n")
-        lines.append("## Lessons Learned\n<!-- 오늘 배운 것 -->\n")
-        lines.append("---\n")
-        return "\n".join(lines)
 
     @staticmethod
     def _clean_ai_output(text: str) -> str:
@@ -507,6 +547,17 @@ class NoteGenerator:
                 break
         cleaned = "\n".join(lines[start_idx:end_idx]).strip()
         return cleaned if cleaned else text.strip()
+
+    @staticmethod
+    def _clean_init_output(text: str) -> str:
+        """Remove wrapping code block (```markdown ... ```) from AI init output."""
+        import re
+        result = text.strip()
+        # Remove wrapping ```markdown ... ``` or ```\n ... ```
+        m = re.match(r'^```(?:markdown)?\s*\n(.*?)```\s*$', result, re.DOTALL)
+        if m:
+            result = m.group(1).strip()
+        return result
 
     def _generate_with_claude_cli(self, changes: dict, today, day_name: str) -> str:
         context = self._build_ai_context(changes)
@@ -535,19 +586,19 @@ class NoteGenerator:
                 cleaned = self._clean_ai_output(r.stdout)
                 return f"\n---\n\n{cleaned}\n\n---\n"
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            print(f"[WARN] Claude CLI failed ({e}), falling back to structured mode")
-        return self._generate_structured(changes, today, day_name)
+            print(f"[ERROR] Claude CLI failed: {e}")
+            sys.exit(1)
 
     def _generate_with_api(self, changes: dict, today, day_name: str) -> str:
         try:
             import anthropic
         except ImportError:
-            print("[WARN] anthropic not installed")
-            return self._generate_structured(changes, today, day_name)
+            print("[ERROR] anthropic 패키지가 설치되지 않았습니다: pip install anthropic")
+            sys.exit(1)
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
-            print("[WARN] ANTHROPIC_API_KEY not set")
-            return self._generate_structured(changes, today, day_name)
+            print("[ERROR] ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다")
+            sys.exit(1)
         context = self._build_ai_context(changes)
         prompt = (f"Output ONLY markdown. No preamble, no explanation. "
                   f"Start directly with '# {today.isoformat()} ({day_name})'.\n"
@@ -566,8 +617,8 @@ class NoteGenerator:
             cleaned = self._clean_ai_output(msg.content[0].text)
             return f"\n---\n\n{cleaned}\n\n---\n"
         except Exception as e:
-            print(f"[WARN] API failed ({e})")
-            return self._generate_structured(changes, today, day_name)
+            print(f"[ERROR] Anthropic API 호출 실패: {e}")
+            sys.exit(1)
 
     def _generate_with_ollama(self, changes: dict, today, day_name: str) -> str:
         context = self._build_ai_context(changes)
@@ -601,8 +652,10 @@ class NoteGenerator:
                 cleaned = self._clean_ai_output(response_text)
                 return f"\n---\n\n{cleaned}\n\n---\n"
         except Exception as e:
-            print(f"[WARN] Ollama failed ({e}), falling back to structured mode")
-        return self._generate_structured(changes, today, day_name)
+            print(f"[ERROR] Ollama 호출 실패: {e}")
+            print("  → ollama serve 실행 여부 확인")
+            print("  → ollama list 로 모델 확인")
+            sys.exit(1)
 
     def _build_ai_context(self, changes: dict) -> str:
         parts = [f"Detection: {changes['method']}", f"Path: {changes['path']}", ""]
@@ -628,11 +681,108 @@ class NoteGenerator:
         with open(template_path, "r", encoding="utf-8") as f:
             template = f.read()
         today = get_date(self.config).isoformat()
-        return template.format(
+        base = template.format(
             project_name=project_config["name"], project_subtitle="Project Description",
             author=os.environ.get("USER", "Author"), start_date=today,
             last_updated=today, current_version="v1",
         )
+
+        # AI is required - resolve() already ensures this
+
+        project_path = Path(project_config["path"]).resolve()
+        # Gather project context: file list + git log
+        context_parts = [f"Project: {project_config['name']}", f"Path: {project_path}", ""]
+
+        # File list with sizes
+        try:
+            r = subprocess.run(
+                ["git", "ls-files"], cwd=project_path,
+                capture_output=True, text=True, timeout=10
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                files = [f.strip() for f in r.stdout.strip().split("\n") if f.strip()]
+                context_parts += ["FILES:"] + [f"  {f}" for f in files] + [""]
+        except Exception:
+            pass
+
+        # Git log
+        try:
+            r = subprocess.run(
+                ["git", "log", "--oneline", "--no-merges"],
+                cwd=project_path, capture_output=True, text=True, timeout=10
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                context_parts += ["GIT COMMITS:"] + [f"  {l.strip()}" for l in r.stdout.strip().split("\n")] + [""]
+        except Exception:
+            pass
+
+        # Read key source files (first 50 lines each, up to 5 files)
+        key_extensions = {".py", ".sh", ".yaml", ".yml"}
+        try:
+            for fp in sorted(project_path.iterdir()):
+                if fp.is_file() and fp.suffix in key_extensions and fp.stat().st_size < 50000:
+                    lines = fp.read_text(encoding="utf-8", errors="ignore").split("\n")[:80]
+                    context_parts += [f"--- {fp.name} (first 80 lines) ---"] + lines + [""]
+        except Exception:
+            pass
+
+        context = "\n".join(context_parts)
+
+        prompt = (
+            "아래 프로젝트 정보를 분석하여 연구노트 초기 템플릿의 빈 섹션을 채워주세요.\n"
+            "기존 마크다운 구조(## 1. Project Overview, ## 2. Data Specification 등)를 그대로 유지하고,\n"
+            "<!-- 주석 --> 자리에 실제 내용을 채워넣으세요.\n"
+            "해당사항이 없는 섹션(예: Loss Function)은 'N/A'로 간결하게 표시하세요.\n"
+            "반드시 마크다운 형식으로만 출력하세요. 설명이나 인사말 없이 채워진 템플릿만 출력하세요.\n\n"
+            f"=== 현재 템플릿 ===\n{base}\n\n"
+            f"=== 프로젝트 정보 ===\n{context}"
+        )
+
+        if self.ai_backend == "claude_cli":
+            try:
+                r = subprocess.run(
+                    ["claude", "-p", prompt], capture_output=True, text=True, timeout=120
+                )
+                if r.returncode == 0 and r.stdout.strip():
+                    result = self._clean_init_output(r.stdout.strip())
+                    # Ensure it has the Daily Log section
+                    if "## Daily Log" not in result:
+                        result += "\n\n---\n\n## Daily Log\n\n<!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->\n"
+                    return result
+            except Exception as e:
+                print(f"[WARN] Claude CLI init failed ({e}), using empty template")
+        elif self.ai_backend == "anthropic_api":
+            try:
+                import anthropic
+                client = anthropic.Anthropic()
+                msg = client.messages.create(
+                    model="claude-sonnet-4-20250514", max_tokens=4096,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                result = self._clean_init_output(msg.content[0].text.strip())
+                if "## Daily Log" not in result:
+                    result += "\n\n---\n\n## Daily Log\n\n<!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->\n"
+                return result
+            except Exception as e:
+                print(f"[WARN] API init failed ({e}), using empty template")
+        elif self.ai_backend == "ollama":
+            try:
+                ollama_model = self.config.get("general", {}).get("ollama", {}).get("model", "llama3.1:8b")
+                payload = json.dumps({"model": ollama_model, "prompt": prompt, "stream": False})
+                req = urllib.request.Request(
+                    "http://localhost:11434/api/generate",
+                    data=payload.encode(), headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    result = self._clean_init_output(json.loads(resp.read().decode()).get("response", "").strip())
+                    if result and "## Daily Log" not in result:
+                        result += "\n\n---\n\n## Daily Log\n\n<!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->\n"
+                    if result:
+                        return result
+            except Exception:
+                pass
+
+        return base
 
 
 # ============================================================================
@@ -702,7 +852,7 @@ class WeeklyMerger:
     def __init__(self, config: dict):
         self.config = config
         ollama_cfg = config.get("general", {}).get("ollama", {})
-        configured = config.get("general", {}).get("ai_backend", "none")
+        configured = config.get("general", {}).get("ai_backend", "auto")
         self.ai_backend = AIBackendDetector.resolve(configured, ollama_cfg.get("model", "llama3.1:8b"))
 
     def merge(self, daily_dir: Path, project_name: str, date: datetime.date) -> Optional[Path]:
@@ -736,7 +886,7 @@ class WeeklyMerger:
 
         # AI Summary
         use_ai = self.config.get("notification", {}).get("weekly", {}).get("ai_summary", False)
-        if use_ai and self.ai_backend != "none":
+        if use_ai:
             all_content = "\n".join(fp.read_text(encoding="utf-8") for _, fp in daily_files)
             summary = self._generate_summary(all_content, project_name, week_start, week_end)
             if summary:

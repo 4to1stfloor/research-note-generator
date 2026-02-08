@@ -167,10 +167,12 @@ else
 fi
 
 # ============================================================
-# Step 2: AI Backend
+# Step 2: AI Backend (필수)
 # ============================================================
 echo ""
-echo -e "${BLUE}━━━ Step 2/4: AI 요약 설정 ━━━${NC}"
+echo -e "${BLUE}━━━ Step 2/4: AI 백엔드 설정 (필수) ━━━${NC}"
+echo ""
+echo "  이 도구는 AI 백엔드가 필수입니다."
 echo ""
 
 AI_DETECTED="none"
@@ -178,17 +180,17 @@ AI_DETECTED="none"
 # 1순위: Claude Code CLI
 if command -v claude &>/dev/null; then
     AI_DETECTED="claude_cli"
-    ok "1순위: Claude Code CLI 감지 → AI 요약 자동 사용"
+    ok "Claude Code CLI 감지 → AI 요약 자동 사용"
 
 # 2순위: Anthropic API Key
 elif [ -n "${ANTHROPIC_API_KEY:-}" ] || ([ -f "${ENV_FILE}" ] && grep -q "ANTHROPIC_API_KEY" "${ENV_FILE}" 2>/dev/null); then
     AI_DETECTED="anthropic_api"
-    ok "2순위: Anthropic API Key 감지 → API로 AI 요약 사용"
+    ok "Anthropic API Key 감지 → API로 AI 요약 사용"
 
 # 3순위: Ollama (로컬 LLM)
 elif command -v ollama &>/dev/null; then
     AI_DETECTED="ollama"
-    ok "3순위: Ollama 감지됨"
+    ok "Ollama 감지됨"
     if ollama list 2>/dev/null | grep -q "llama"; then
         ok "모델 준비 완료 → 로컬 AI 요약 사용"
     else
@@ -196,47 +198,95 @@ elif command -v ollama &>/dev/null; then
         ollama pull llama3.1:8b 2>&1 | tail -1
         ok "모델 다운로드 완료"
     fi
-
-# 4순위: 아무것도 없음 → Ollama 설치 제안
-else
-    warn "AI 백엔드가 감지되지 않았습니다."
-    echo ""
-    echo "  Ollama를 설치하면 로컬에서 무료로 AI 요약을 사용할 수 있습니다."
-    echo "  (GPU 없이도 동작, 약 4.7GB 디스크 필요)"
-    echo ""
-    read -p "  Ollama 설치할까요? (Y/n): " INSTALL_OLLAMA
-    if [[ ! "$INSTALL_OLLAMA" =~ ^[nN] ]]; then
-        info "Ollama 설치 중..."
-        curl -fsSL https://ollama.com/install.sh | sh 2>&1 | tail -3
-        if command -v ollama &>/dev/null; then
-            ok "Ollama 설치 완료"
-            info "모델 다운로드 중 (llama3.1:8b, 약 4.7GB)..."
-            ollama pull llama3.1:8b 2>&1 | tail -1
-            ok "모델 다운로드 완료"
-            AI_DETECTED="ollama"
-        else
-            warn "Ollama 설치 실패 → AI 없이 진행합니다"
-            info "나중에 수동 설치: curl -fsSL https://ollama.com/install.sh | sh"
-        fi
-    else
-        ok "건너뜀"
-    fi
 fi
 
-# AI 없을 때 안내
+# AI 없음 → 해결 시도
+if [ "$AI_DETECTED" = "none" ]; then
+    warn "AI 백엔드가 감지되지 않았습니다."
+    echo ""
+    echo "  아래 방법 중 하나를 선택해주세요:"
+    echo ""
+    echo -e "    ${BOLD}1)${NC} Anthropic API Key 입력"
+    echo -e "    ${BOLD}2)${NC} Ollama 설치 (로컬, 무료, GPU 없이도 동작)"
+    echo -e "    ${BOLD}3)${NC} 종료"
+    echo ""
+    read -p "  선택 (1/2/3): " AI_CHOICE
+
+    case "$AI_CHOICE" in
+        1)
+            echo ""
+            read -p "  Anthropic API Key (sk-ant-...): " API_KEY_INPUT
+            if [ -n "$API_KEY_INPUT" ]; then
+                # .env에 저장
+                if [ -f "${ENV_FILE}" ]; then
+                    # 기존 키가 있으면 교체
+                    if grep -q "ANTHROPIC_API_KEY" "${ENV_FILE}" 2>/dev/null; then
+                        sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${API_KEY_INPUT}|" "${ENV_FILE}"
+                    else
+                        echo "ANTHROPIC_API_KEY=${API_KEY_INPUT}" >> "${ENV_FILE}"
+                    fi
+                else
+                    echo "ANTHROPIC_API_KEY=${API_KEY_INPUT}" > "${ENV_FILE}"
+                fi
+                export ANTHROPIC_API_KEY="${API_KEY_INPUT}"
+                AI_DETECTED="anthropic_api"
+                ok "API Key 저장 완료 → API로 AI 요약 사용"
+            else
+                fail "API Key가 입력되지 않았습니다"
+            fi
+            ;;
+        2)
+            info "Ollama 설치 중..."
+            curl -fsSL https://ollama.com/install.sh | sh 2>&1 | tail -3
+            if command -v ollama &>/dev/null; then
+                ok "Ollama 설치 완료"
+                info "모델 다운로드 중 (llama3.1:8b, 약 4.7GB)..."
+                ollama pull llama3.1:8b 2>&1 | tail -1
+                ok "모델 다운로드 완료"
+                AI_DETECTED="ollama"
+            else
+                fail "Ollama 설치 실패"
+            fi
+            ;;
+        *)
+            ;;
+    esac
+fi
+
+# 최종 확인: AI 없으면 종료
 if [ "$AI_DETECTED" = "none" ]; then
     echo ""
-    echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "  ${BOLD}  AI 요약 없이 진행합니다${NC}"
-    echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}  AI 백엔드 없이는 사용할 수 없습니다${NC}"
+    echo -e "  ${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo "  변경 감지, 노트 생성, 이메일 알림 등 핵심 기능은 모두 동작합니다."
-    echo "  단, 변경사항의 AI 요약은 생성되지 않습니다."
+    echo "  사용할 수 없는 원인:"
     echo ""
-    echo "  나중에 AI를 추가하려면:"
-    echo -e "    ${CYAN}1) Claude Code CLI 설치 (구독 필요)${NC}"
-    echo -e "    ${CYAN}2) Anthropic API Key를 .env에 추가${NC}"
+    echo -e "    ${RED}✗${NC} Claude Code CLI 미설치 (claude 명령어 없음)"
+    echo -e "    ${RED}✗${NC} Anthropic API Key 미설정 (ANTHROPIC_API_KEY 환경변수 없음)"
+    # Ollama 상세 원인
+    if command -v ollama &>/dev/null; then
+        if ! curl -sf http://localhost:11434/api/tags &>/dev/null; then
+            echo -e "    ${RED}✗${NC} Ollama 설치됨, 서비스 미실행 (ollama serve 필요)"
+        elif ! ollama list 2>/dev/null | grep -q "."; then
+            echo -e "    ${RED}✗${NC} Ollama 실행 중이나 모델 없음 (ollama pull llama3.1:8b 필요)"
+        fi
+    else
+        echo -e "    ${RED}✗${NC} Ollama 미설치"
+    fi
+    # GPU 정보
+    if ! command -v nvidia-smi &>/dev/null; then
+        echo -e "    ${YELLOW}⚠${NC}  GPU 없음 → Ollama CPU 모드 가능하나 느릴 수 있음"
+    elif ! nvidia-smi &>/dev/null; then
+        echo -e "    ${YELLOW}⚠${NC}  GPU 드라이버 오류 → Ollama CPU 모드로 대체 가능"
+    fi
+    echo ""
+    echo "  해결 방법 (하나만 선택):"
+    echo -e "    ${CYAN}1) Claude Code 설치: https://docs.anthropic.com/en/docs/claude-code${NC}"
+    echo -e "    ${CYAN}2) API Key 발급: https://console.anthropic.com/${NC}"
     echo -e "    ${CYAN}3) Ollama 설치: curl -fsSL https://ollama.com/install.sh | sh${NC}"
+    echo ""
+    exit 1
 fi
 
 # ============================================================

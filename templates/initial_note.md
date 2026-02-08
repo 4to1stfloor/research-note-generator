@@ -117,14 +117,6 @@
 
 ---
 
-## 12. Lessons Learned
-
-### 12.1 What Worked
-### 12.2 What Didn't Work
-### 12.3 Key Insights
-
----
-
 ## Daily Log
 
 <!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->
