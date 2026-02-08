@@ -3,6 +3,8 @@
 # Research Note Generator - Cron Setup Script
 # ============================================================================
 # Sets up a daily cron job to run the research note generator at midnight.
+# - 매일 자정: 일일 노트 생성 + 알림
+# - 매주 월요일: 주간 리포트 생성 (7일치 daily 병합 + AI 요약)
 #
 # Usage:
 #   bash scripts/setup_cron.sh          # Install cron job
@@ -26,7 +28,7 @@ setup_cron() {
     echo ""
     echo "Script dir : ${SCRIPT_DIR}"
     echo "Python     : ${PYTHON_BIN}"
-    echo "Schedule   : ${CRON_SCHEDULE} (daily at midnight)"
+    echo "Schedule   : ${CRON_SCHEDULE} (daily at midnight + weekly on Monday)"
     echo "Log dir    : ${LOG_DIR}"
     echo ""
 
