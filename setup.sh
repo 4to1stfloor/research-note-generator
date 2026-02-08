@@ -144,7 +144,7 @@ if [[ "$CONFIRM" =~ ^[nN] ]]; then echo "  취소됨."; exit 0; fi
 # Step 1: Python Check
 # ============================================================
 echo ""
-echo -e "${BLUE}━━━ Step 1/3: Python 확인 ━━━${NC}"
+echo -e "${BLUE}━━━ Step 1/4: Python 확인 ━━━${NC}"
 echo ""
 
 PYTHON_CMD=""
@@ -167,10 +167,58 @@ else
 fi
 
 # ============================================================
-# Step 2: Email (simplified)
+# Step 2: AI Backend
 # ============================================================
 echo ""
-echo -e "${BLUE}━━━ Step 2/3: 이메일 알림 ━━━${NC}"
+echo -e "${BLUE}━━━ Step 2/4: AI 요약 설정 ━━━${NC}"
+echo ""
+
+AI_DETECTED="none"
+
+if command -v claude &>/dev/null; then
+    AI_DETECTED="claude_cli"
+    ok "Claude Code CLI 감지 → AI 요약 자동 사용"
+elif command -v ollama &>/dev/null; then
+    AI_DETECTED="ollama"
+    ok "Ollama 감지됨"
+    # Check if a model is available
+    if ollama list 2>/dev/null | grep -q "llama"; then
+        ok "모델 준비 완료 → AI 요약 자동 사용"
+    else
+        info "모델 다운로드 중 (llama3.1:8b, 약 4.7GB)..."
+        ollama pull llama3.1:8b 2>&1 | tail -1
+        ok "모델 다운로드 완료"
+    fi
+else
+    warn "AI 백엔드가 감지되지 않았습니다."
+    echo ""
+    echo "  Ollama를 설치하면 로컬에서 무료로 AI 요약을 사용할 수 있습니다."
+    echo "  (GPU 없이도 동작, 약 4.7GB 디스크 필요)"
+    echo ""
+    read -p "  Ollama 설치할까요? (Y/n): " INSTALL_OLLAMA
+    if [[ ! "$INSTALL_OLLAMA" =~ ^[nN] ]]; then
+        info "Ollama 설치 중..."
+        curl -fsSL https://ollama.com/install.sh | sh 2>&1 | tail -3
+        if command -v ollama &>/dev/null; then
+            ok "Ollama 설치 완료"
+            info "모델 다운로드 중 (llama3.1:8b, 약 4.7GB)..."
+            ollama pull llama3.1:8b 2>&1 | tail -1
+            ok "모델 다운로드 완료"
+            AI_DETECTED="ollama"
+        else
+            warn "Ollama 설치 실패 → AI 없이 진행합니다"
+            info "나중에 수동 설치: curl -fsSL https://ollama.com/install.sh | sh"
+        fi
+    else
+        ok "건너뜀 (AI 없이 구조화된 템플릿만 생성됩니다)"
+    fi
+fi
+
+# ============================================================
+# Step 3: Email (simplified)
+# ============================================================
+echo ""
+echo -e "${BLUE}━━━ Step 3/4: 이메일 알림 ━━━${NC}"
 echo ""
 
 EMAIL_RECIPIENT=""
@@ -270,7 +318,7 @@ fi
 # Step 3: Config (append or create)
 # ============================================================
 echo ""
-echo -e "${BLUE}━━━ Step 3/3: 설정 저장 ━━━${NC}"
+echo -e "${BLUE}━━━ Step 4/4: 설정 저장 ━━━${NC}"
 echo ""
 
 # Build include patterns as Python list string
