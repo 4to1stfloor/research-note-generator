@@ -194,7 +194,13 @@ class ChangeDetector:
     def _match(self, fp: str) -> bool:
         if self._should_exclude(fp):
             return False
-        return any(fnmatch.fnmatch(fp, p) for p in self.include)
+        for p in self.include:
+            if fnmatch.fnmatch(fp, p):
+                return True
+            # **/ prefix: also match root-level files (e.g. **/*.py matches main.py)
+            if p.startswith("**/") and fnmatch.fnmatch(fp, p[3:]):
+                return True
+        return False
 
     def _should_exclude(self, fp: str) -> bool:
         # Auto-exclude by basename

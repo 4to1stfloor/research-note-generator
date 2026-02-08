@@ -26,15 +26,15 @@ general:
 # Projects to monitor
 # 모니터링할 프로젝트를 등록하세요. 여러 프로젝트를 등록할 수 있습니다.
 projects:
-  - name: "my_project"
-    path: "./my_project"              # 프로젝트 경로 (절대/상대)
-    detection: "mtime"                # "git" | "mtime" | "auto"
+  - name: "research_note_generator"
+    path: "/home/seokwon/nas1_deep/pro_side_research_note/research_note_generator"
+    detection: "git"
     include_patterns:
       - "**/*.py"
-      - "**/*.R"
+      - "**/*.sh"
       - "**/*.yaml"
       - "**/*.yml"
-      - "**/*.sh"
+      - "**/*.md"
     exclude_patterns:
       - "**/__pycache__/**"
       - "**/.git/**"
@@ -42,8 +42,8 @@ projects:
       - "**/results/**"
       - "**/logs/**"
       - "**/daily/**"
-    note_output: "./my_project/RESEARCH_NOTE.md"
-    daily_dir: "./my_project/daily"
+    note_output: "/home/seokwon/nas1_deep/pro_side_research_note/research_note_generator/RESEARCH_NOTE.md"
+    daily_dir: "/home/seokwon/nas1_deep/pro_side_research_note/research_note_generator/daily"
 
   # 프로젝트 추가 예시:
   # - name: "another_project"
