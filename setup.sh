@@ -175,20 +175,29 @@ echo ""
 
 AI_DETECTED="none"
 
+# 1순위: Claude Code CLI
 if command -v claude &>/dev/null; then
     AI_DETECTED="claude_cli"
-    ok "Claude Code CLI 감지 → AI 요약 자동 사용"
+    ok "1순위: Claude Code CLI 감지 → AI 요약 자동 사용"
+
+# 2순위: Anthropic API Key
+elif [ -n "${ANTHROPIC_API_KEY:-}" ] || ([ -f "${ENV_FILE}" ] && grep -q "ANTHROPIC_API_KEY" "${ENV_FILE}" 2>/dev/null); then
+    AI_DETECTED="anthropic_api"
+    ok "2순위: Anthropic API Key 감지 → API로 AI 요약 사용"
+
+# 3순위: Ollama (로컬 LLM)
 elif command -v ollama &>/dev/null; then
     AI_DETECTED="ollama"
-    ok "Ollama 감지됨"
-    # Check if a model is available
+    ok "3순위: Ollama 감지됨"
     if ollama list 2>/dev/null | grep -q "llama"; then
-        ok "모델 준비 완료 → AI 요약 자동 사용"
+        ok "모델 준비 완료 → 로컬 AI 요약 사용"
     else
         info "모델 다운로드 중 (llama3.1:8b, 약 4.7GB)..."
         ollama pull llama3.1:8b 2>&1 | tail -1
         ok "모델 다운로드 완료"
     fi
+
+# 4순위: 아무것도 없음 → Ollama 설치 제안
 else
     warn "AI 백엔드가 감지되지 않았습니다."
     echo ""
@@ -210,8 +219,24 @@ else
             info "나중에 수동 설치: curl -fsSL https://ollama.com/install.sh | sh"
         fi
     else
-        ok "건너뜀 (AI 없이 구조화된 템플릿만 생성됩니다)"
+        ok "건너뜀"
     fi
+fi
+
+# AI 없을 때 안내
+if [ "$AI_DETECTED" = "none" ]; then
+    echo ""
+    echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}  AI 요약 없이 진행합니다${NC}"
+    echo -e "  ${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  변경 감지, 노트 생성, 이메일 알림 등 핵심 기능은 모두 동작합니다."
+    echo "  단, 변경사항의 AI 요약은 생성되지 않습니다."
+    echo ""
+    echo "  나중에 AI를 추가하려면:"
+    echo -e "    ${CYAN}1) Claude Code CLI 설치 (구독 필요)${NC}"
+    echo -e "    ${CYAN}2) Anthropic API Key를 .env에 추가${NC}"
+    echo -e "    ${CYAN}3) Ollama 설치: curl -fsSL https://ollama.com/install.sh | sh${NC}"
 fi
 
 # ============================================================
