@@ -516,17 +516,6 @@ PYEOF
 fi
 
 # ============================================================
-# Initialize & first run
-# ============================================================
-echo ""
-info "RESEARCH_NOTE.md 생성 중..."
-$PYTHON_CMD "${SCRIPT_DIR}/generate_note.py" --init "${PROJECT_NAME}" 2>&1 | while IFS= read -r line; do echo "  $line"; done
-
-echo ""
-info "첫 번째 변경 감지..."
-$PYTHON_CMD "${SCRIPT_DIR}/generate_note.py" --project "${PROJECT_NAME}" --verbose 2>&1 | while IFS= read -r line; do echo "  $line"; done
-
-# ============================================================
 # Cron (optional)
 # ============================================================
 echo ""
@@ -552,7 +541,26 @@ if [ "$EMAIL_ENABLED" = "true" ]; then
 echo -e "  ${BOLD}이메일:${NC}   ${EMAIL_RECIPIENT}"
 fi
 echo ""
-echo -e "  다른 프로젝트도 추가하려면:"
+if [[ ! "$AUTO_RUN" =~ ^[nN] ]]; then
+echo -e "  ${BOLD}Cron 해제:${NC}"
+echo -e "    ${CYAN}bash ${SCRIPT_DIR}/scripts/setup_cron.sh remove${NC}"
+echo ""
+fi
+echo -e "  ${BOLD}다른 프로젝트 추가:${NC}"
 echo -e "    ${CYAN}cd /path/to/other_project${NC}"
 echo -e "    ${CYAN}curl -fsSL https://raw.githubusercontent.com/4to1stfloor/research-note-generator/main/install.sh | bash${NC}"
 echo ""
+
+# ============================================================
+# Initialize & first run (설정 완료 후 실행 - 파일이 많으면 오래 걸릴 수 있음)
+# ============================================================
+echo ""
+info "RESEARCH_NOTE.md 생성 중... (파일이 많으면 시간이 걸릴 수 있습니다)"
+$PYTHON_CMD "${SCRIPT_DIR}/generate_note.py" --init "${PROJECT_NAME}" 2>&1 | while IFS= read -r line; do echo "  $line"; done
+
+echo ""
+info "첫 번째 일일 노트 생성 중..."
+$PYTHON_CMD "${SCRIPT_DIR}/generate_note.py" --project "${PROJECT_NAME}" --verbose 2>&1 | while IFS= read -r line; do echo "  $line"; done
+
+echo ""
+echo -e "${GREEN}✓ 초기 노트 생성 완료!${NC}"
