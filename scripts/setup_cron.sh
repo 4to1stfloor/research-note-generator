@@ -2,8 +2,8 @@
 # ============================================================================
 # Research Note Generator - Cron Setup Script
 # ============================================================================
-# Sets up a daily cron job to run the research note generator at midnight.
-# - 매일 자정: 일일 노트 생성 + 알림
+# Sets up a daily cron job to run the research note generator at 23:59.
+# - 매일 23:59: 일일 노트 생성 + 알림 (전날 작업 요약)
 # - 매주 월요일: 주간 리포트 생성 (7일치 daily 병합 + AI 요약)
 #
 # Usage:
@@ -17,8 +17,8 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 CRON_COMMENT="# research-note-generator"
 LOG_DIR="${SCRIPT_DIR}/logs"
 
-# Cron schedule: midnight KST (00:00)
-CRON_SCHEDULE="0 0 * * *"
+# Cron schedule: 23:59 (전날 23시 59분에 실행 → 전날 날짜로 노트 생성)
+CRON_SCHEDULE="59 23 * * *"
 
 # Use wrapper script (handles .env loading with spaces in passwords)
 CRON_CMD="/bin/bash ${SCRIPT_DIR}/scripts/run_cron.sh ${CRON_COMMENT}"
@@ -28,7 +28,7 @@ setup_cron() {
     echo ""
     echo "Script dir : ${SCRIPT_DIR}"
     echo "Python     : ${PYTHON_BIN}"
-    echo "Schedule   : ${CRON_SCHEDULE} (daily at midnight + weekly on Monday)"
+    echo "Schedule   : ${CRON_SCHEDULE} (daily at 23:59 + weekly on Monday)"
     echo "Log dir    : ${LOG_DIR}"
     echo ""
 
