@@ -1,9 +1,9 @@
 name: Daily Research Note Generator
 
 on:
-  # Daily at midnight KST (15:00 UTC)
+  # Daily at 23:59 KST (14:59 UTC)
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '59 14 * * *'
   # Manual trigger
   workflow_dispatch:
     inputs:
@@ -95,7 +95,6 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          cd research_note_generator
           ARGS=""
           if [ "${{ github.event.inputs.project }}" != "" ]; then
             ARGS="--project ${{ github.event.inputs.project }}"
