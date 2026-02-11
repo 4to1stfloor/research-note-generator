@@ -689,6 +689,109 @@ class NoteGenerator:
             parts.append(f"STATS: {stats.get('total_files', 0)} files, {stats.get('total_lines', 0)} lines")
         return "\n".join(parts)
 
+    def _get_commits_by_date(self, project_path: Path) -> dict:
+        """Get all commits grouped by date (YYYY-MM-DD)."""
+        try:
+            r = subprocess.run(
+                ["git", "log", "--all", "--date=short", "--format=%ad|%H|%s"],
+                cwd=project_path, capture_output=True, text=True, timeout=30
+            )
+            if r.returncode != 0:
+                return {}
+
+            commits_by_date = {}
+            for line in r.stdout.strip().split("\n"):
+                if not line.strip():
+                    continue
+                parts = line.split("|", 2)
+                if len(parts) < 3:
+                    continue
+                date_str, commit_hash, subject = parts
+                if date_str not in commits_by_date:
+                    commits_by_date[date_str] = []
+                commits_by_date[date_str].append({"hash": commit_hash, "subject": subject})
+
+            return commits_by_date
+        except Exception as e:
+            print(f"[WARN] Failed to get commit history: {e}")
+            return {}
+
+    def _backfill_history(self, project_config: dict, note_path: Path):
+        """Backfill daily entries from git history."""
+        project_path = Path(project_config["path"]).resolve()
+        commits_by_date = self._get_commits_by_date(project_path)
+
+        if not commits_by_date:
+            print("[INFO] No git history found, skipping backfill")
+            return
+
+        # Sort dates chronologically (oldest first)
+        sorted_dates = sorted(commits_by_date.keys())
+        print(f"[INFO] Backfilling {len(sorted_dates)} days from git history...")
+
+        for date_str in sorted_dates:
+            commits = commits_by_date[date_str]
+            print(f"  Processing {date_str} ({len(commits)} commits)...")
+
+            # Get changes for this date (all commits combined)
+            try:
+                # Get diff for the entire day
+                first_commit = commits[-1]["hash"]  # Oldest commit of the day
+                last_commit = commits[0]["hash"]    # Newest commit of the day
+
+                # Get parent of first commit
+                parent_r = subprocess.run(
+                    ["git", "rev-parse", f"{first_commit}^"],
+                    cwd=project_path, capture_output=True, text=True
+                )
+                if parent_r.returncode == 0:
+                    parent_hash = parent_r.stdout.strip()
+                else:
+                    # First commit in repo, compare with empty tree
+                    parent_hash = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+                # Get combined diff
+                diff_r = subprocess.run(
+                    ["git", "diff", "--stat", parent_hash, last_commit],
+                    cwd=project_path, capture_output=True, text=True
+                )
+
+                # Build changes dict
+                changes = {
+                    "project": project_config["name"],
+                    "new": [],
+                    "modified": [],
+                    "deleted": [],
+                    "commits": [f"{c['hash'][:7]} {c['subject']}" for c in commits],
+                    "diffs": {},
+                    "stats": {}
+                }
+
+                # Generate AI entry
+                from datetime import datetime
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                day_name = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"][date_obj.weekday()]
+
+                # Use AI to generate entry
+                if self.ai_backend == "claude_cli":
+                    entry = self._generate_with_claude_cli(changes, date_obj, day_name)
+                elif self.ai_backend == "anthropic_api":
+                    entry = self._generate_with_api(changes, date_obj, day_name)
+                elif self.ai_backend == "ollama":
+                    entry = self._generate_with_ollama(changes, date_obj, day_name)
+                else:
+                    continue
+
+                # Append to note
+                NoteWriter.append_entry(note_path, entry, date_override=date_obj)
+                print(f"    ✓ {date_str} entry added")
+
+            except Exception as e:
+                print(f"    ✗ Failed to process {date_str}: {e}")
+                continue
+
+        print(f"[OK] Backfill complete: {len(sorted_dates)} daily entries added")
+
     def generate_initial_note(self, project_config: dict) -> str:
         template_path = self.templates_dir / "initial_note.md"
         with open(template_path, "r", encoding="utf-8") as f:
@@ -813,6 +916,12 @@ class NoteWriter:
             return
 
         content = note_path.read_text(encoding="utf-8")
+
+        # Remove placeholder comment on first entry
+        placeholder = "<!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->"
+        if placeholder in content:
+            content = content.replace(placeholder, "").strip()
+
         content = content.rstrip() + "\n" + entry + "\n"
 
         today = (date_override or datetime.date.today()).isoformat()
@@ -1172,6 +1281,9 @@ def main():
             print(f"[DRY-RUN] Would create: {note_path}\n{content}")
         else:
             NoteWriter.create_initial(note_path, content)
+            print("")
+            print("[INFO] Backfilling daily entries from git history...")
+            gen._backfill_history(pc, note_path)
         return
 
     # --weekly
