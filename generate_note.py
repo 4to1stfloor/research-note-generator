@@ -593,7 +593,7 @@ class NoteGenerator:
         try:
             r = subprocess.run(
                 ["claude", "--print", "-p", prompt],
-                capture_output=True, text=True, timeout=120
+                capture_output=True, text=True, timeout=None
             )
             if r.returncode == 0 and r.stdout.strip():
                 cleaned = self._clean_ai_output(r.stdout)
