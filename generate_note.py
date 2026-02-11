@@ -723,6 +723,13 @@ class NoteGenerator:
 
         if not commits_by_date:
             print("[INFO] No git history found, skipping backfill")
+            # Still remove placeholder comment even if no backfill
+            if note_path.exists():
+                content = note_path.read_text(encoding="utf-8")
+                placeholder = "<!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->"
+                if placeholder in content:
+                    content = content.replace(placeholder, "").strip() + "\n"
+                    note_path.write_text(content, encoding="utf-8")
             return
 
         # Sort dates chronologically (oldest first)
