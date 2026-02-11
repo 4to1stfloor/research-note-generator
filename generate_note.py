@@ -771,6 +771,8 @@ class NoteGenerator:
             changes = {
                 "method": "mtime",
                 "project": project_config["name"],
+                "path": str(Path(project_config["path"]).resolve()),
+                "date": date_str,
                 "modified": files,
                 "new": [],
                 "deleted": [],
