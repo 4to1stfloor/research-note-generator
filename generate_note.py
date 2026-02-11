@@ -550,14 +550,27 @@ class NoteGenerator:
 
     @staticmethod
     def _clean_init_output(text: str) -> str:
-        """Remove wrapping code block (```markdown ... ```) from AI init output."""
+        """Remove AI preamble and wrapping code blocks from init output."""
         import re
         result = text.strip()
-        # Remove wrapping ```markdown ... ``` or ```\n ... ```
-        m = re.match(r'^```(?:markdown)?\s*\n(.*?)```\s*$', result, re.DOTALL)
+
+        # Remove wrapping ```markdown ... ``` (anywhere in text, not just at start)
+        m = re.search(r'```(?:markdown)?\s*\n(.*?)```', result, re.DOTALL)
         if m:
             result = m.group(1).strip()
-        return result
+
+        # Remove any preamble before the first markdown heading
+        lines = result.split('\n')
+        first_heading_idx = None
+        for i, line in enumerate(lines):
+            if line.strip().startswith('#'):
+                first_heading_idx = i
+                break
+
+        if first_heading_idx is not None and first_heading_idx > 0:
+            result = '\n'.join(lines[first_heading_idx:])
+
+        return result.strip()
 
     def _generate_with_claude_cli(self, changes: dict, today, day_name: str) -> str:
         context = self._build_ai_context(changes)
