@@ -716,14 +716,105 @@ class NoteGenerator:
             print(f"[WARN] Failed to get commit history: {e}")
             return {}
 
+    def _get_files_by_mtime(self, project_config: dict) -> dict:
+        """Get all files grouped by modification date (YYYY-MM-DD)."""
+        project_path = Path(project_config["path"]).resolve()
+        include_patterns = project_config.get("include_patterns", ["**/*"])
+        exclude_patterns = project_config.get("exclude_patterns", [])
+
+        files_by_date = {}
+        today = datetime.date.today()
+
+        for pattern in include_patterns:
+            for fp in project_path.glob(pattern):
+                if not fp.is_file():
+                    continue
+
+                rel_path = str(fp.relative_to(project_path))
+
+                # Check exclusions
+                should_exclude = False
+                for excl in exclude_patterns:
+                    if fnmatch.fnmatch(rel_path, excl):
+                        should_exclude = True
+                        break
+                if should_exclude or rel_path == "RESEARCH_NOTE.md":
+                    continue
+
+                try:
+                    mtime = fp.stat().st_mtime
+                    mtime_date = datetime.date.fromtimestamp(mtime)
+
+                    # Skip today (will be handled by regular daily generation)
+                    if mtime_date >= today:
+                        continue
+
+                    date_str = mtime_date.isoformat()
+                    if date_str not in files_by_date:
+                        files_by_date[date_str] = []
+                    files_by_date[date_str].append(rel_path)
+                except (OSError, PermissionError):
+                    continue
+
+        return files_by_date
+
+    def _backfill_from_mtime(self, project_config: dict, note_path: Path, files_by_date: dict):
+        """Generate backfill entries from mtime-grouped files."""
+        sorted_dates = sorted(files_by_date.keys())
+        print(f"[INFO] Backfilling {len(sorted_dates)} days from file modification times...")
+
+        for date_str in sorted_dates:
+            files = files_by_date[date_str]
+            print(f"  Processing {date_str} ({len(files)} files)...")
+
+            # Build changes dict (limited info without git)
+            changes = {
+                "method": "mtime",
+                "project": project_config["name"],
+                "modified": files,
+                "new": [],
+                "deleted": [],
+                "commits": [f"Files modified on {date_str}"],
+                "diffs": {},
+                "stats": {}
+            }
+
+            # Generate AI entry
+            try:
+                date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                day_name = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"][date_obj.weekday()]
+
+                # Use AI to generate entry
+                if self.ai_backend == "claude_cli":
+                    entry = self._generate_with_claude_cli(changes, date_obj, day_name)
+                elif self.ai_backend == "anthropic_api":
+                    entry = self._generate_with_api(changes, date_obj, day_name)
+                elif self.ai_backend == "ollama":
+                    entry = self._generate_with_ollama(changes, date_obj, day_name)
+                else:
+                    continue
+
+                # Append to note
+                NoteWriter.append_entry(note_path, entry, date_override=date_obj)
+                print(f"    ✓ {date_str} entry added")
+            except Exception as e:
+                print(f"    ✗ Failed to generate entry for {date_str}: {e}")
+
     def _backfill_history(self, project_config: dict, note_path: Path):
-        """Backfill daily entries from git history."""
+        """Backfill daily entries from git history or mtime."""
         project_path = Path(project_config["path"]).resolve()
         commits_by_date = self._get_commits_by_date(project_path)
 
         if not commits_by_date:
-            print("[INFO] No git history found, skipping backfill")
-            # Still remove placeholder comment even if no backfill
+            print("[INFO] No git history found, trying mtime-based backfill...")
+            # Try mtime-based backfill
+            files_by_date = self._get_files_by_mtime(project_config)
+            if files_by_date:
+                self._backfill_from_mtime(project_config, note_path, files_by_date)
+            else:
+                print("[INFO] No file history to backfill")
+
+            # Still remove placeholder comment
             if note_path.exists():
                 content = note_path.read_text(encoding="utf-8")
                 placeholder = "<!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->"
