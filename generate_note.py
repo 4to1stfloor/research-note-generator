@@ -716,7 +716,7 @@ class NoteGenerator:
         except Exception:
             pass
 
-        # Read key source files (first 50 lines each, up to 5 files)
+        # Read key source files (first 80 lines each)
         key_extensions = {".py", ".sh", ".yaml", ".yml"}
         try:
             for fp in sorted(project_path.iterdir()):
@@ -742,7 +742,7 @@ class NoteGenerator:
         if self.ai_backend == "claude_cli":
             try:
                 r = subprocess.run(
-                    ["claude", "-p", prompt], capture_output=True, text=True, timeout=120
+                    ["claude", "-p", prompt], capture_output=True, text=True, timeout=None
                 )
                 if r.returncode == 0 and r.stdout.strip():
                     result = self._clean_init_output(r.stdout.strip())
@@ -774,7 +774,7 @@ class NoteGenerator:
                     "http://localhost:11434/api/generate",
                     data=payload.encode(), headers={"Content-Type": "application/json"}
                 )
-                with urllib.request.urlopen(req, timeout=120) as resp:
+                with urllib.request.urlopen(req, timeout=None) as resp:
                     result = self._clean_init_output(json.loads(resp.read().decode()).get("response", "").strip())
                     if result and "## Daily Log" not in result:
                         result += "\n\n---\n\n## Daily Log\n\n<!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->\n"
