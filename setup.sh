@@ -559,8 +559,6 @@ info "RESEARCH_NOTE.md 생성 중... (파일이 많으면 시간이 걸릴 수 �
 $PYTHON_CMD "${SCRIPT_DIR}/generate_note.py" --init "${PROJECT_NAME}" 2>&1 | while IFS= read -r line; do echo "  $line"; done
 
 echo ""
-info "첫 번째 일일 노트 생성 중..."
-$PYTHON_CMD "${SCRIPT_DIR}/generate_note.py" --project "${PROJECT_NAME}" --verbose 2>&1 | while IFS= read -r line; do echo "  $line"; done
-
-echo ""
 echo -e "${GREEN}✓ 초기 노트 생성 완료!${NC}"
+echo ""
+echo -e "  ${BOLD}일일 노트:${NC} Cron 설정 시 매일 23:59에 자동 생성됩니다"
