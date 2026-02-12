@@ -10,6 +10,9 @@ LOG_DIR="${SCRIPT_DIR}/logs"
 LOG_FILE="${LOG_DIR}/cron_$(date +%Y%m%d).log"
 mkdir -p "${LOG_DIR}"
 
+# Ensure common PATH (cron has minimal PATH)
+export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node/ 2>/dev/null | tail -1)/bin:/usr/local/bin:$PATH" 2>/dev/null
+
 # Load .env (if exists)
 if [ -f "${SCRIPT_DIR}/.env" ]; then
     set -a
