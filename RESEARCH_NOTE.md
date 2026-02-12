@@ -4,7 +4,7 @@
 > **Project**: research_note_generator
 > **Author**: seokwon
 > **Started**: 2026-02-09
-> **Last Updated**: 2026-02-09
+> **Last Updated**: 2026-02-11
 > **Current Version**: v1
 
 ---
@@ -258,7 +258,7 @@ ollama pull llama3.1:8b
 
 ## Daily Log
 
-<!-- 날짜별 엔트리가 여기 아래에 최신순으로 쌓입니다 -->
+
 
 ---
 
@@ -348,6 +348,334 @@ N/A - 이 프로젝트는 연구 노트 생성 도구로, 모델 학습이나 �
 3. **UX 기본값의 중요성**: 사용자 대다수가 원하는 옵션을 기본값으로 설정하면 설정 과정이 더 직관적. cron 자동 실행을 opt-out 방식으로 변경하여 사용성 개선.
 
 4. **점진적 개선**: 초기 커밋부터 현재까지 사용자 피드백을 반영한 15개의 커밋으로 지속적 개선. 설치 프로세스 단순화 (one-line installer), 이메일 설정 가이드 개선, multi-project 지원 등.
+
+---
+
+---
+
+# 2026-02-10 (Tue)
+
+## Changes Summary
+
+| 구분 | 파일 | 변경 요약 |
+|------|------|-----------|
+| NEW | `.github/workflows/daily_note.yml` | GitHub Actions 워크플로우 (일간/주간 리포트 자동화) |
+| NEW | `README.md` | 프로젝트 문서 (설치, 사용법, 설정) |
+| NEW | `config.yaml` | 프로젝트 설정 파일 (경로, 이메일, AI 백엔드) |
+| NEW | `generate_note.py` | 핵심 노트 생성 스크립트 (git 분석, AI 요약) |
+| NEW | `install.sh` | 원라인 설치 스크립트 (curl pipe 호환) |
+| NEW | `scripts/run_cron.sh` | cron 실행 스크립트 |
+| NEW | `scripts/setup_cron.sh` | cron 작업 설정 스크립트 |
+| NEW | `setup.sh` | 대화형 설정 마법사 |
+| NEW | `templates/daily_entry.md` | 일간 엔트리 템플릿 |
+| NEW | `templates/initial_note.md` | 초기 노트 템플릿 |
+
+## Key Changes Detail
+
+### 프로젝트 초기 구조 완성
+- **자동화된 연구 노트 생성기**: git 변경사항 기반으로 일간/주간 연구 노트 자동 생성
+- **AI 백엔드 지원**: Claude API, Ollama (로컬), OpenAI 순으로 자동 감지
+- **다중 프로젝트 지원**: 하나의 설정 파일로 여러 프로젝트 관리 가능
+
+### 주요 기능
+- `generate_note.py`: git diff/log 분석 → AI 요약 → 마크다운 생성
+- `setup.sh`: 프로젝트 자동 감지, 이메일 설정, AI 백엔드 선택
+- GitHub Actions: daily (매일 23:50 KST), weekly (월요일 00:00 KST)
+
+## Architecture Updates
+
+```
+research_note_generator/
+├── generate_note.py      # 핵심 로직 (git 분석 + AI 요약)
+├── config.yaml           # 프로젝트/이메일/AI 설정
+├── templates/            # 마크다운 템플릿
+├── scripts/              # cron 관련 스크립트
+├── .github/workflows/    # CI/CD 자동화
+└── setup.sh / install.sh # 설치 스크립트
+```
+
+## Issues & Solutions (증상→원인→시도→해결)
+
+### 1. curl pipe에서 stdin 문제
+- **증상**: `curl -fsSL ... | bash` 실행 시 대화형 입력 불가
+- **원인**: stdin이 curl 출력으로 점유됨
+- **시도**: 다양한 fd 리디렉션 방식
+- **해결**: `exec < /dev/tty`로 stdin 복원 (a814594, eec58dd)
+
+### 2. AI 백엔드 필수화
+- **증상**: AI 없이 실행 시 의미 없는 노트 생성
+- **원인**: fallback 모드가 단순 파일 목록만 출력
+- **시도**: no-AI 가이드 추가
+- **해결**: AI 백엔드를 필수로 변경, Ollama 설치 옵션 제공 (6e31c9b)
+
+### 3. HTML 주석 제거 문제
+- **증상**: 생성된 노트에 `<!-- -->` 주석 잔존
+- **원인**: AI가 템플릿 주석을 그대로 출력
+- **해결**: AI 프롬프트에 주석 제거 명시 (c6fcf1a)
+
+## Training / Experiment Status
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| Claude API 연동 | ✅ 완료 | 기본 백엔드 |
+| Ollama 연동 | ✅ 완료 | 로컬 대안 |
+| GitHub Actions | ✅ 완료 | 일간/주간 자동화 |
+| 이메일 발송 | ✅ 완료 | SMTP 지원 |
+
+## Lessons Learned
+
+1. **curl pipe 호환성**: 설치 스크립트 작성 시 `exec < /dev/tty` 패턴 필수
+2. **AI 의존성 명확화**: fallback 없이 명확한 요구사항 제시가 사용자 경험에 유리
+3. **fnmatch 패턴**: 루트 레벨 파일 매칭 시 `**` 패턴과 명시적 파일명 패턴 병행 필요
+
+---
+
+---
+
+# 2026-02-10 (Tue)
+
+## Changes Summary
+
+| 카테고리 | 파일 | 변경 요약 |
+|---------|------|----------|
+| CI/CD | `.github/workflows/daily_note.yml` | GitHub Actions 워크플로우로 일일 노트 자동 생성 |
+| Core | `generate_note.py` | AI 기반 연구 노트 생성 메인 스크립트 |
+| Config | `config.yaml` | 프로젝트 설정 (경로, 이메일, AI 백엔드) |
+| Setup | `setup.sh`, `install.sh` | 대화형 설정 마법사 및 원라인 설치 스크립트 |
+| Scripts | `scripts/run_cron.sh`, `scripts/setup_cron.sh` | Cron 기반 자동 실행 스크립트 |
+| Templates | `templates/daily_entry.md`, `templates/initial_note.md` | 일일/초기 노트 템플릿 |
+| Docs | `README.md` | 프로젝트 문서 |
+
+## Key Changes Detail
+
+### AI 백엔드 필수화 (6e31c9b)
+- No-AI 폴백 모드 완전 제거
+- Claude API, Ollama, OpenAI 중 하나 필수 사용
+- AI 없이는 의미 있는 연구 노트 생성 불가능하다는 판단
+
+### Cron 스케줄 조정 (c26adb8)
+- 00:00 → 23:59로 변경
+- 하루 마무리 시점에 해당일 작업 내용 캡처
+
+### 주간 리포트 기능 추가 (2627742)
+- 월요일에 daily + weekly 모두 생성
+- 주간 단위 회고 지원
+
+## Architecture Updates
+
+```
+research_note_generator/
+├── generate_note.py      # 메인 진입점 (git diff 분석 → AI 요약)
+├── config.yaml           # 프로젝트별 설정
+├── setup.sh              # 대화형 설정 (curl | bash 지원)
+├── scripts/
+│   ├── run_cron.sh       # 크론 실행 래퍼
+│   └── setup_cron.sh     # 크론 등록 스크립트
+└── templates/            # 마크다운 템플릿
+```
+
+- **AI 백엔드 우선순위**: Claude API → Ollama → OpenAI
+- **설치 방식**: `curl -sL ... | bash` 원라인 설치 지원
+
+## Issues & Solutions
+
+| 증상 | 원인 | 시도 | 해결 |
+|------|------|------|------|
+| curl 파이프 시 사용자 입력 불가 | stdin이 curl 출력에 연결됨 | - | `/dev/tty`에서 stdin 리다이렉트 (eec58dd) |
+| echo 색상 코드 출력 안됨 | `-e` 플래그 누락 | - | echo에 `-e` 플래그 추가 (fb7d66d) |
+| 섹션 7 HTML 주석 잔존 | AI가 템플릿 주석 제거 안함 | 프롬프트 수정 | AI에게 주석 제거 명시적 지시 (c6fcf1a) |
+
+## Training / Experiment Status
+
+| 실험명 | 상태 | 비고 |
+|--------|------|------|
+| N/A | - | 본 프로젝트는 도구 개발 프로젝트 |
+
+## Lessons Learned
+
+- **curl 파이프 설치 시 stdin 처리**: 대화형 스크립트는 반드시 `/dev/tty`에서 입력받아야 함
+- **크론 타이밍**: 일일 기록은 자정 직전(23:59)이 해당일 작업 캡처에 유리
+- **AI 필수 의존성**: 의미 있는 자동 요약에는 AI가 필수, 폴백 모드는 오히려 혼란 유발
+
+---
+
+---
+
+# 2026-02-10 (Tue)
+
+## Changes Summary
+NEW: 10 files, 2637 lines
+
+## Key Changes Detail
+* feat: add weekly report to cron (daily + weekly on Monday)
+* feat: make AI backend mandatory, remove no-AI fallback mode
+* fix: change cron schedule from 00:00 to 23:59
+
+## Architecture Updates
+* Separate sender/receiver emails in setup wizard
+* Improve email setup: detailed step-by-step app password guide
+
+## Issues & Solutions
+* None reported
+
+## Training / Experiment Status
+* Not applicable
+
+## Lessons Learned
+* None reported
+
+---
+
+---
+
+# 2026-02-11 (Wed)
+
+## Changes Summary
+NEW (10):
+  + .github/workflows/daily_note.yml
+  + README.md
+  + config.yaml
+  + generate_note.py
+  + install.sh
+  + scripts/run_cron.sh
+  + scripts/setup_cron.sh
+  + setup.sh
+  + templates/daily_entry.md
+  + templates/initial_note.md
+
+## Key Changes Detail
+  ecc4f45 fix: remove timeout limit for Claude CLI in daily generation
+  dcaa98a fix: add missing 'path' and 'date' keys in mtime backfill
+  311cc95 feat: add mtime-based backfill for non-git folders
+  c89494a fix: remove placeholder comment even when backfill is skipped
+
+## Architecture Updates
+  fb4a710 feat: add placeholder removal and git history backfill
+  9918dd7 fix: improve init output cleaning (remove AI preamble)
+  3410ebe fix: remove first daily note generation on install
+  cbd1b45 fix: remove timeout limit for init (allow infinite wait)
+
+## Issues & Solutions
+  c26adb8 fix: change cron schedule from 00:00 to 23:59
+  c6fcf1a fix: ensure AI removes HTML comments in section 7
+
+## Training / Experiment Status
+  fd24c81 fix: move init/daily generation after setup complete message
+  2627742 feat: add weekly report to cron (daily + weekly on Monday)
+
+## Lessons Learned
+  6e31c9b feat: make AI backend mandatory, remove no-AI fallback mode
+  8c27241 feat: fix fnmatch root-level matching + generate full project research note
+
+---
+
+---
+
+# 2026-02-11 (Wed)
+
+## Changes Summary
+NEW (10):
+  + .github/workflows/daily_note.yml
+  + README.md
+  + config.yaml
+  + generate_note.py
+  + install.sh
+  + scripts/run_cron.sh
+  + scripts/setup_cron.sh
+  + setup.sh
+  + templates/daily_entry.md
+  + templates/initial_note.md
+
+## Key Changes Detail
+COMMITS:
+  ecc4f45 fix: remove timeout limit for Claude CLI in daily generation
+  dcaa98a fix: add missing 'path' and 'date' keys in mtime backfill
+  311cc95 feat: add mtime-based backfill for non-git folders
+  c89494a fix: remove placeholder comment even when backfill is skipped
+  fb4a710 feat: add placeholder removal and git history backfill
+  9918dd7 fix: improve init output cleaning (remove AI preamble)
+  3410ebe fix: remove first daily note generation on install
+  cbd1b45 fix: remove timeout limit for init (allow infinite wait)
+  9f18608 fix: GitHub Actions workflow directory path error
+  c26adb8 fix: change cron schedule from 00:00 to 23:59
+
+## Architecture Updates
+STATS: 10 files, 2859 lines
+
+## Issues & Solutions
+None reported
+
+## Training / Experiment Status
+Not applicable
+
+## Lessons Learned
+None noted
+
+---
+
+---
+
+# 2026-02-11 (Wed)
+
+## Changes Summary
+| 구분 | 파일 | 변경 |
+|------|------|------|
+| NEW | `.github/workflows/daily_note.yml` | GitHub Actions 워크플로우 |
+| NEW | `README.md` | 프로젝트 문서화 |
+| NEW | `config.yaml` | 설정 파일 |
+| NEW | `generate_note.py` | 메인 노트 생성 스크립트 |
+| NEW | `install.sh` | 원라인 설치 스크립트 |
+| NEW | `scripts/run_cron.sh` | 크론 실행 스크립트 |
+| NEW | `scripts/setup_cron.sh` | 크론 설정 스크립트 |
+| NEW | `setup.sh` | 대화형 설정 마법사 |
+| NEW | `templates/daily_entry.md` | 일일 노트 템플릿 |
+| NEW | `templates/initial_note.md` | 초기 노트 템플릿 |
+
+## Key Changes Detail
+- **Research Note Generator 프로젝트 초기 구축 완료**: Git 변경사항을 기반으로 일일 연구 노트를 자동 생성하는 도구
+- **AI 백엔드 통합**: Claude CLI를 기본 AI 백엔드로 사용하여 노트 생성
+- **mtime 기반 백필 기능**: Git이 아닌 폴더에서도 파일 수정 시간 기반으로 변경 이력 추적 가능
+- **GitHub Actions 워크플로우**: 매일 23:59에 자동으로 노트 생성 및 커밋
+- **원라인 설치 지원**: `curl | bash` 방식의 간편 설치 스크립트 제공
+
+## Architecture Updates
+```
+research_note_generator/
+├── .github/workflows/    # CI/CD 자동화
+│   └── daily_note.yml    # 일일 노트 생성 워크플로우
+├── scripts/              # 유틸리티 스크립트
+│   ├── run_cron.sh       # 크론 작업 실행
+│   └── setup_cron.sh     # 크론 설정
+├── templates/            # 마크다운 템플릿
+│   ├── daily_entry.md    # 일일 항목 템플릿
+│   └── initial_note.md   # 초기 노트 템플릿
+├── config.yaml           # 프로젝트 설정
+├── generate_note.py      # 핵심 생성 로직
+├── setup.sh              # 대화형 설정
+└── install.sh            # 원라인 설치
+```
+
+## Issues & Solutions
+| 증상 | 원인 | 시도 | 해결 |
+|------|------|------|------|
+| Claude CLI 타임아웃 발생 | 긴 노트 생성 시 기본 타임아웃 초과 | 타임아웃 값 증가 | 타임아웃 제한 완전 제거 (`ecc4f45`) |
+| mtime 백필 시 KeyError | `path`와 `date` 키 누락 | 딕셔너리 구조 확인 | 누락된 키 추가 (`dcaa98a`) |
+| curl 파이프 시 stdin 문제 | `curl \| bash` 실행 시 stdin이 curl 출력으로 연결됨 | - | `/dev/tty`에서 stdin 복원 (`a814594`) |
+| AI 응답에 불필요한 프리앰블 포함 | AI가 인사말/설명 추가 | 프롬프트 개선 | 출력 클리닝 로직 추가 (`9918dd7`) |
+
+## Training / Experiment Status
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 프로젝트 초기화 | ✅ 완료 | 28개 커밋으로 안정화 |
+| AI 백엔드 통합 | ✅ 완료 | Claude CLI 사용 |
+| GitHub Actions | ✅ 완료 | 매일 23:59 실행 |
+| 주간 리포트 | ✅ 완료 | 월요일 자동 생성 |
+
+## Lessons Learned
+- **AI 출력 신뢰성**: AI 응답은 항상 후처리가 필요함 - 프리앰블 제거, HTML 코멘트 정리 등
+- **타임아웃 설계**: AI 기반 작업은 실행 시간 예측이 어려우므로 무제한 또는 넉넉한 타임아웃 설정 권장
+- **curl 파이프 패턴**: `curl | bash` 설치 스크립트에서 사용자 입력이 필요한 경우 `/dev/tty` 리다이렉션 필수
+- **점진적 기능 추가**: No-AI 폴백 모드를 제거하고 AI 백엔드를 필수로 전환하여 코드 복잡도 감소
 
 ---
 
