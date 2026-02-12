@@ -19,6 +19,11 @@ fi
 
 cd "${SCRIPT_DIR}"
 
+# 0. Auto-update (git pull)
+if [ -d "${SCRIPT_DIR}/.git" ]; then
+    git -C "${SCRIPT_DIR}" pull --quiet >> "${LOG_FILE}" 2>&1 || true
+fi
+
 # 1. Daily note generation (매일)
 echo "=== Daily Run: $(date) ===" >> "${LOG_FILE}"
 python3 generate_note.py --send --verbose >> "${LOG_FILE}" 2>&1
