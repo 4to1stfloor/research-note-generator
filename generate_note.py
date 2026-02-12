@@ -574,11 +574,14 @@ class NoteGenerator:
 
     def _generate_with_claude_cli(self, changes: dict, today, day_name: str) -> str:
         context = self._build_ai_context(changes)
-        prompt = (f"Generate a daily research note entry. "
-                  f"Output ONLY the markdown content. "
-                  f"Do NOT include any preamble, explanation, greeting, or commentary. "
-                  f"Start directly with '# {today.isoformat()} ({day_name})'. "
-                  f"Korean body, English headings.\n\n"
+        prompt = (f"일일 연구노트 엔트리를 생성하세요.\n"
+                  f"마크다운 콘텐츠만 출력하세요. 인사말, 설명, 서문 등 절대 포함하지 마세요.\n"
+                  f"반드시 '# {today.isoformat()} ({day_name})'로 시작하세요.\n\n"
+                  f"**언어 규칙 (반드시 준수)**:\n"
+                  f"- 섹션 제목(##)은 영어로 작성\n"
+                  f"- 본문 내용은 반드시 한국어로 작성 (영어 금지)\n"
+                  f"- 코드명, 파일명, 기술 용어는 영어 그대로 사용 가능\n"
+                  f"- 변경사항이 적어도 구체적이고 상세하게 한국어로 분석하세요\n\n"
                   f"Project: {changes['project']}\n\n"
                   f"{context}\n\n"
                   f"Sections (in order):\n"
@@ -589,7 +592,7 @@ class NoteGenerator:
                   f"## Issues & Solutions (증상→원인→시도→해결)\n"
                   f"## Training / Experiment Status\n"
                   f"## Lessons Learned\n\n"
-                  f"Be concise. NO preamble. Start with # heading immediately.")
+                  f"서문 없이 바로 # 헤딩으로 시작하세요.")
         try:
             r = subprocess.run(
                 ["claude", "--print", "-p", prompt],
@@ -613,14 +616,20 @@ class NoteGenerator:
             print("[ERROR] ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다")
             sys.exit(1)
         context = self._build_ai_context(changes)
-        prompt = (f"Output ONLY markdown. No preamble, no explanation. "
-                  f"Start directly with '# {today.isoformat()} ({day_name})'.\n"
-                  f"Korean body, English headings.\n\n"
+        prompt = (f"일일 연구노트 엔트리를 생성하세요.\n"
+                  f"마크다운 콘텐츠만 출력하세요. 인사말, 설명, 서문 등 절대 포함하지 마세요.\n"
+                  f"반드시 '# {today.isoformat()} ({day_name})'로 시작하세요.\n\n"
+                  f"**언어 규칙 (반드시 준수)**:\n"
+                  f"- 섹션 제목(##)은 영어로 작성\n"
+                  f"- 본문 내용은 반드시 한국어로 작성 (영어 금지)\n"
+                  f"- 코드명, 파일명, 기술 용어는 영어 그대로 사용 가능\n"
+                  f"- 변경사항이 적어도 구체적이고 상세하게 한국어로 분석하세요\n\n"
                   f"Project: {changes['project']}\n\n"
                   f"{context}\n\n"
                   f"Sections: # date, ## Changes Summary, ## Key Changes Detail, "
                   f"## Architecture Updates, ## Issues & Solutions, "
-                  f"## Training / Experiment Status, ## Lessons Learned.")
+                  f"## Training / Experiment Status, ## Lessons Learned.\n\n"
+                  f"서문 없이 바로 # 헤딩으로 시작하세요.")
         try:
             client = anthropic.Anthropic(api_key=api_key)
             msg = client.messages.create(
@@ -635,9 +644,14 @@ class NoteGenerator:
 
     def _generate_with_ollama(self, changes: dict, today, day_name: str) -> str:
         context = self._build_ai_context(changes)
-        prompt = (f"Output ONLY markdown. No preamble, no explanation, no greeting. "
-                  f"Start directly with '# {today.isoformat()} ({day_name})'.\n"
-                  f"Korean body, English headings.\n\n"
+        prompt = (f"일일 연구노트 엔트리를 생성하세요.\n"
+                  f"마크다운 콘텐츠만 출력하세요. 인사말, 설명, 서문 등 절대 포함하지 마세요.\n"
+                  f"반드시 '# {today.isoformat()} ({day_name})'로 시작하세요.\n\n"
+                  f"**언어 규칙 (반드시 준수)**:\n"
+                  f"- 섹션 제목(##)은 영어로 작성\n"
+                  f"- 본문 내용은 반드시 한국어로 작성 (영어 금지)\n"
+                  f"- 코드명, 파일명, 기술 용어는 영어 그대로 사용 가능\n"
+                  f"- 변경사항이 적어도 구체적이고 상세하게 한국어로 분석하세요\n\n"
                   f"Project: {changes['project']}\n\n"
                   f"{context}\n\n"
                   f"Sections:\n"
@@ -645,7 +659,7 @@ class NoteGenerator:
                   f"## Changes Summary\n## Key Changes Detail\n"
                   f"## Architecture Updates\n## Issues & Solutions\n"
                   f"## Training / Experiment Status\n## Lessons Learned\n\n"
-                  f"Be concise. Start with # heading immediately.")
+                  f"서문 없이 바로 # 헤딩으로 시작하세요.")
         try:
             data = json.dumps({
                 "model": self.ollama_model,
