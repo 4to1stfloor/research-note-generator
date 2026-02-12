@@ -20,6 +20,9 @@ on:
           - 'false'
           - 'true'
 
+permissions:
+  contents: write
+
 jobs:
   generate-note:
     runs-on: ubuntu-latest
