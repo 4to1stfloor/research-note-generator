@@ -140,12 +140,10 @@ ollama pull llama3.1:8b
 2. `.env`에 `SLACK_BOT_TOKEN="xoxb-..."` 입력
 3. `config.yaml`에서 `slack.enabled: true`, `recipients`에 User ID 입력
 
-## Automation
-
-### Option A: Cron (로컬)
+## Automation (Cron)
 
 ```bash
-# cron job 설치 (매일 자정 실행)
+# cron job 설치 (매일 23:59 실행)
 bash scripts/setup_cron.sh install
 
 # 상태 확인
@@ -155,16 +153,21 @@ bash scripts/setup_cron.sh status
 bash scripts/setup_cron.sh remove
 ```
 
-### Option B: GitHub Actions
+### Cron 해제 방법
 
-1. 이 저장소를 GitHub에 push
-2. (선택) `Settings > Secrets > Actions`에서:
-   - `ANTHROPIC_API_KEY` - API 사용 시
-   - `SMTP_SENDER`, `SMTP_PASSWORD` - 이메일 사용 시
-3. 매일 자정(KST)에 자동 실행
-4. 수동 실행: `Actions > Daily Research Note Generator > Run workflow`
+```bash
+# 방법 1: 스크립트로 해제
+bash ~/.research-note-generator/scripts/setup_cron.sh remove
 
-Claude/API가 없으면 GitHub Actions에서 자동으로 Ollama를 설치하여 AI 요약을 수행합니다.
+# 방법 2: 수동 해제
+crontab -l                        # 현재 등록된 cron 확인
+crontab -l | grep research-note   # research-note 관련 항목 확인
+crontab -l | grep -v "research-note" | crontab -   # 해당 항목만 제거
+crontab -l                        # 제거 확인
+
+# 방법 3: 직접 편집
+crontab -e                        # 편집기에서 해당 줄 삭제 후 저장
+```
 
 ## Generated Note Structure
 
@@ -212,12 +215,9 @@ research-note-generator/
 ├── templates/
 │   ├── initial_note.md        # 초기 노트 템플릿
 │   └── daily_entry.md         # 일일 엔트리 템플릿
-├── scripts/
-│   ├── setup_cron.sh          # Cron 자동 설정
-│   └── run_cron.sh            # Cron 실행 래퍼
-└── .github/
-    └── workflows/
-        └── daily_note.yml     # GitHub Actions
+└── scripts/
+    ├── setup_cron.sh          # Cron 자동 설정
+    └── run_cron.sh            # Cron 실행 래퍼
 ```
 
 ## Requirements
