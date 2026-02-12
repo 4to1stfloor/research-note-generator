@@ -1,13 +1,15 @@
 # Research Note Generator
 
-프로젝트 변경사항을 자동으로 감지하여 체계적인 연구노트를 생성하는 도구.
+프로젝트 변경사항을 자동으로 감지하여 AI가 체계적인 연구노트를 생성하는 도구.
 
 ## Features
 
 - **자동 변경 감지**: Git diff 또는 파일 수정시간(mtime) 기반
-- **일일 연구노트**: 날짜별 자동 생성 (개별 daily 파일 + 누적 RESEARCH_NOTE.md)
-- **주간 리포트**: 7일치 daily 노트를 자동 병합 + AI 요약
-- **AI 분석 (필수)**: Claude CLI / Anthropic API / Ollama(로컬 LLM) 자동 감지
+- **AI 분석 (필수)**: Claude CLI / Anthropic API / Ollama 자동 감지
+- **일일 연구노트**: 매일 23:59 자동 생성 (개별 daily 파일 + 누적 RESEARCH_NOTE.md)
+- **주간 리포트**: 7일치 daily 노트를 자동 병합 + AI 요약 (월요일)
+- **히스토리 백필**: 초기 설치 시 과거 git 커밋 또는 파일 수정시간을 분석하여 이전 로그 자동 생성
+- **자동 업데이트**: cron 실행 시 자동으로 최신 코드 반영 (git pull)
 - **알림**: Email(Gmail SMTP) / Slack DM 자동 발송
 - **유휴 감지**: N일간 변경 없으면 자동 중단, 변경 시 자동 재개
 - **다중 프로젝트**: config에 여러 프로젝트 등록 가능
@@ -29,9 +31,11 @@ curl -fsSL https://raw.githubusercontent.com/4to1stfloor/research-note-generator
 - 파일 유형 자동 감지 (.py, .R, .js 등)
 - Git 저장소 여부 자동 판별
 - Python/PyYAML 설치 확인
+- AI 백엔드 자동 감지 (Claude CLI / Anthropic API / Ollama)
 - 이메일 알림 설정 (선택)
-- RESEARCH_NOTE.md 자동 생성
-- 매일 자동 실행 설정 (선택)
+- RESEARCH_NOTE.md 초기 생성 (AI가 프로젝트 분석)
+- 과거 히스토리 백필 (git 커밋 또는 파일 mtime 기반)
+- 매일 23:59 자동 실행 설정 (선택)
 
 ---
 
@@ -62,7 +66,7 @@ vi .env  # SMTP_SENDER, SMTP_PASSWORD 입력
 projects:
   - name: "my_project"
     path: "./my_project"       # 또는 절대 경로
-    detection: "mtime"         # git | mtime | auto
+    detection: "auto"          # git | mtime | auto (권장)
     include_patterns:
       - "**/*.py"
       - "**/*.yaml"
@@ -75,7 +79,7 @@ projects:
 ### 3. 실행
 
 ```bash
-# 초기 노트 생성 (최초 1회)
+# 초기 노트 생성 (최초 1회) - AI가 프로젝트 분석 + 과거 히스토리 백필
 python generate_note.py --init my_project
 
 # 일일 노트 생성
@@ -94,31 +98,38 @@ python generate_note.py --send
 python generate_note.py --weekly
 ```
 
-## AI Backend
+## AI Backend (필수)
 
-`config.yaml`의 `ai_backend` 설정으로 AI 요약 기능을 사용할 수 있습니다.
-`"auto"` 모드(기본값)에서는 아래 순서대로 자동 감지합니다:
+AI 백엔드가 **반드시 하나 이상** 필요합니다. `config.yaml`의 `ai_backend: "auto"` (기본값)에서 아래 순서로 자동 감지합니다:
 
-| 우선순위 | Backend | 설명 | 필요 조건 |
+| 우선순위 | Backend | 설명 | 설치 방법 |
 |---------|---------|------|----------|
-| 1 | `claude_cli` | Claude Code CLI 사용 | Claude 구독 + CLI 설치 |
-| 2 | `ollama` | 로컬 LLM (무료) | Ollama 설치 + 모델 pull |
-| 3 | `anthropic_api` | Anthropic API | API Key |
-| 4 | `none` | AI 없이 구조화된 템플릿만 | 없음 |
+| 1 | `claude_cli` | Claude Code CLI | `curl -fsSL https://claude.ai/install.sh \| bash` |
+| 2 | `ollama` | 로컬 LLM (무료) | `curl -fsSL https://ollama.com/install.sh \| sh` |
+| 3 | `anthropic_api` | Anthropic API | `ANTHROPIC_API_KEY` 환경변수 설정 |
 
-AI 없이도 변경 감지, 노트 생성, 알림 등 모든 핵심 기능이 동작합니다.
-
-### Ollama (로컬 LLM) 사용
+### Claude Code CLI 설치
 
 ```bash
-# Ollama 설치
+# 공식 설치 (기본 경로: ~/.local/bin/claude)
+curl -fsSL https://claude.ai/install.sh | bash
+
+# 또는 npm으로 설치
+npm install -g @anthropic-ai/claude-code
+```
+
+### Ollama (로컬 LLM, 무료) 설치
+
+```bash
 curl -fsSL https://ollama.com/install.sh | sh
-
-# 모델 다운로드
 ollama pull llama3.1:8b
+```
 
-# config.yaml에서 설정
-# ai_backend: "auto"  (자동 감지) 또는 "ollama" (직접 지정)
+### Anthropic API 사용
+
+```bash
+# ~/.research-note-generator/.env 에 추가
+ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
 ## Notifications
@@ -152,6 +163,8 @@ bash scripts/setup_cron.sh status
 # 제거
 bash scripts/setup_cron.sh remove
 ```
+
+cron 실행 시 자동으로 `git pull`하여 최신 코드를 반영합니다.
 
 ### Cron 해제 방법
 
@@ -189,14 +202,14 @@ crontab -e                        # 편집기에서 해당 줄 삭제 후 저장
 Daily Log (날짜별 자동 엔트리)
 ```
 
-### Daily Entry (자동 생성)
+### Daily Entry (자동 생성, 한국어 본문 + 영어 헤딩)
 
 ```
-# YYYY-MM-DD (Day)
+# YYYY-MM-DD (요일)
 ## Changes Summary
 ## Key Changes Detail
 ## Architecture Updates
-## Issues & Solutions
+## Issues & Solutions (증상→원인→시도→해결)
 ## Training / Experiment Status
 ## Lessons Learned
 ```
@@ -204,8 +217,8 @@ Daily Log (날짜별 자동 엔트리)
 ## File Structure
 
 ```
-research-note-generator/
-├── setup.sh                   # 초보자용 설정 마법사
+~/.research-note-generator/
+├── setup.sh                   # 설정 마법사
 ├── generate_note.py           # 메인 스크립트
 ├── config.yaml                # 설정 파일
 ├── .env.example               # 환경변수 템플릿
@@ -224,9 +237,9 @@ research-note-generator/
 
 - Python 3.8+
 - PyYAML (`pip install pyyaml`)
-- Git (git 기반 변경 감지 시)
+- Git (git 기반 변경 감지 시, 없어도 mtime 모드로 동작)
 - **AI 백엔드 (하나 이상 필수)**:
-  - Claude Code CLI (구독 필요) — 또는
+  - Claude Code CLI (`curl -fsSL https://claude.ai/install.sh | bash`) — 또는
   - Anthropic API Key (`ANTHROPIC_API_KEY` 환경변수) — 또는
   - Ollama (로컬 LLM, 무료, `curl -fsSL https://ollama.com/install.sh | sh`)
 
