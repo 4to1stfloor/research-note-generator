@@ -1464,7 +1464,25 @@ def main():
             continue
 
         if total == 0:
-            print(f"[SKIP] No changes for {pc['name']}")
+            print(f"[INFO] No changes for {pc['name']}, writing minimal entry")
+            today = get_date(config)
+            day_names = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+            day_name = day_names[today.weekday()]
+            entry = (
+                f"\n---\n\n"
+                f"# {today.isoformat()} ({day_name})\n\n"
+                f"변경 사항 없음.\n\n"
+                f"---\n"
+            )
+
+            if not args.dry_run:
+                note_path = (config_dir / pc.get("note_output", "")).resolve()
+                if note_path.exists():
+                    NoteWriter.append_entry(note_path, entry, date_override=today)
+                daily_dir = (config_dir / pc.get("daily_dir", f"./{pc['name']}/daily")).resolve()
+                DailyFileWriter.write(daily_dir, pc["name"], today, entry)
+            else:
+                print(f"\n[DRY-RUN] Would write:\n{'─'*40}\n{entry}\n{'─'*40}")
             continue
 
         # Generate entry
