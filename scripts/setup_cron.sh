@@ -20,8 +20,8 @@ LOG_DIR="${SCRIPT_DIR}/logs"
 # Cron schedule: 23:59 (전날 23시 59분에 실행 → 전날 날짜로 노트 생성)
 CRON_SCHEDULE="59 23 * * *"
 
-# Use wrapper script (handles .env loading with spaces in passwords)
-CRON_CMD="/bin/bash ${SCRIPT_DIR}/scripts/run_cron.sh ${CRON_COMMENT}"
+# Auto-update + wrapper script (git pull ensures latest code before run)
+CRON_CMD="cd ${SCRIPT_DIR} && git pull -q 2>/dev/null; /bin/bash ${SCRIPT_DIR}/scripts/run_cron.sh ${CRON_COMMENT}"
 
 setup_cron() {
     echo "=== Research Note Generator - Cron Setup ==="
