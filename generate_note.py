@@ -192,6 +192,25 @@ class ChangeDetector:
 
         self._save_state(current)
         changes["stats"] = self._get_file_stats()
+
+        # Read file contents for modified/new files (so AI can analyze actual changes)
+        max_files = 20
+        max_lines = 50
+        files_to_read = (changes["modified"] + changes["new"])[:max_files]
+        for fp in files_to_read:
+            full_path = self.path / fp
+            if not full_path.is_file():
+                continue
+            try:
+                content = full_path.read_text(errors="replace")
+                lines = content.split("\n")[:max_lines]
+                if previous and fp in changes["modified"]:
+                    changes["diffs"][fp] = f"[mtime-changed] 현재 파일 내용 (첫 {len(lines)}줄):\n" + "\n".join(lines)
+                else:
+                    changes["diffs"][fp] = f"[new-file] 파일 내용 (첫 {len(lines)}줄):\n" + "\n".join(lines)
+            except (PermissionError, OSError, UnicodeDecodeError):
+                continue
+
         return changes
 
     def _scan_files(self) -> dict:
@@ -794,6 +813,19 @@ class NoteGenerator:
                 "diffs": {},
                 "stats": {}
             }
+
+            # Read file contents for AI analysis (up to 20 files, 50 lines each)
+            project_path = Path(project_config["path"]).resolve()
+            for fp in files[:20]:
+                full_path = project_path / fp
+                if not full_path.is_file():
+                    continue
+                try:
+                    content = full_path.read_text(errors="replace")
+                    lines = content.split("\n")[:50]
+                    changes["diffs"][fp] = f"[mtime-backfill] 파일 내용 (첫 {len(lines)}줄):\n" + "\n".join(lines)
+                except (PermissionError, OSError, UnicodeDecodeError):
+                    continue
 
             # Generate AI entry
             try:
