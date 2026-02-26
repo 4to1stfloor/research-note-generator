@@ -62,10 +62,42 @@ if [ "${PROJECT_PATH}" = "${SCRIPT_DIR}" ]; then
     exit 1
 fi
 
-echo -e "  ${BOLD}감지된 프로젝트:${NC}"
+# Show existing registered projects (if any)
+PYTHON_CMD_TEMP=""
+command -v python3 &>/dev/null && PYTHON_CMD_TEMP="python3" || { command -v python &>/dev/null && PYTHON_CMD_TEMP="python"; }
+if [ -n "$PYTHON_CMD_TEMP" ] && [ -f "${CONFIG_FILE}" ]; then
+    EXISTING_PROJECTS=$($PYTHON_CMD_TEMP -c "
+import yaml
+try:
+    with open('${CONFIG_FILE}') as f:
+        c = yaml.safe_load(f) or {}
+    projects = c.get('projects', [])
+    if projects:
+        print(f'  현재 등록된 프로젝트 ({len(projects)}개):')
+        for i, p in enumerate(projects, 1):
+            det = p.get('detection', 'auto')
+            print(f'    {i}. {p[\"name\"]} → {p[\"path\"]} ({det})')
+except:
+    pass
+" 2>/dev/null)
+    if [ -n "$EXISTING_PROJECTS" ]; then
+        echo -e "${YELLOW}${EXISTING_PROJECTS}${NC}"
+        echo ""
+    fi
+fi
+
+echo -e "  ${BOLD}새로 등록할 프로젝트:${NC}"
 echo ""
 ok "이름: ${PROJECT_NAME}"
 ok "경로: ${PROJECT_PATH}"
+
+# Allow user to change project name
+echo ""
+read -p "  프로젝트 이름 변경? (Enter로 유지, 또는 새 이름 입력): " CUSTOM_NAME
+if [ -n "$CUSTOM_NAME" ]; then
+    PROJECT_NAME="$CUSTOM_NAME"
+    ok "이름 변경: ${PROJECT_NAME}"
+fi
 
 # Auto-detect file types
 PY_COUNT=$(find "${PROJECT_PATH}" -maxdepth 3 -name "*.py" 2>/dev/null | wc -l)
@@ -521,9 +553,22 @@ fi
 echo ""
 echo -e "${BLUE}━━━ 매일 자동 실행 (선택) ━━━${NC}"
 echo ""
-read -p "  매일 자정 자동 실행? (Y/n): " AUTO_RUN
-if [[ ! "$AUTO_RUN" =~ ^[nN] ]]; then
-    bash "${SCRIPT_DIR}/scripts/setup_cron.sh" install
+
+# Check if cron is already set up
+CRON_EXISTS="false"
+if crontab -l 2>/dev/null | grep -q "research-note-generator"; then
+    CRON_EXISTS="true"
+fi
+
+if [ "$CRON_EXISTS" = "true" ]; then
+    ok "Cron 이미 설정됨 → 새 프로젝트도 자동 포함됩니다"
+    info "(등록된 모든 프로젝트를 매일 23:59에 처리)"
+    AUTO_RUN="Y"
+else
+    read -p "  매일 자정 자동 실행? (Y/n): " AUTO_RUN
+    if [[ ! "$AUTO_RUN" =~ ^[nN] ]]; then
+        bash "${SCRIPT_DIR}/scripts/setup_cron.sh" install
+    fi
 fi
 
 # ============================================================
@@ -534,9 +579,25 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║  ${BOLD}설정 완료!${NC}${GREEN}                                      ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  ${BOLD}프로젝트:${NC} ${PROJECT_NAME}"
-echo -e "  ${BOLD}경로:${NC}     ${PROJECT_PATH}"
-echo -e "  ${BOLD}노트:${NC}     ${PROJECT_PATH}/RESEARCH_NOTE.md"
+
+# Show all registered projects summary
+if [ -n "$PYTHON_CMD" ] && [ -f "${CONFIG_FILE}" ]; then
+    $PYTHON_CMD -c "
+import yaml
+with open('${CONFIG_FILE}') as f:
+    c = yaml.safe_load(f) or {}
+projects = c.get('projects', [])
+if projects:
+    print(f'  등록된 전체 프로젝트 ({len(projects)}개):')
+    for i, p in enumerate(projects, 1):
+        det = p.get('detection', 'auto')
+        marker = ' ← 방금 추가' if p['name'] == '${PROJECT_NAME}' else ''
+        print(f'    {i}. {p[\"name\"]} → {p[\"path\"]} ({det}){marker}')
+" 2>/dev/null
+    echo ""
+fi
+
+echo -e "  ${BOLD}노트 경로:${NC} ${PROJECT_PATH}/RESEARCH_NOTE.md"
 if [ "$EMAIL_ENABLED" = "true" ]; then
 echo -e "  ${BOLD}이메일:${NC}   ${EMAIL_RECIPIENT}"
 fi
