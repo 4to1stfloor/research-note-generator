@@ -336,10 +336,11 @@ class IdleDetector:
                 state["paused"] = True
                 result["should_run"] = False
                 result["paused"] = True
-                print(f"  [PAUSE] {project_name}: {idle_days}일간 변경 없음 → 자동 중단")
+                print(f"  [PAUSE] {project_name}: {idle_days}일간 변경 없음 → 자동 중단 (다른 프로젝트는 영향 없음)")
             elif is_paused:
                 result["should_run"] = False
                 result["paused"] = True
+                print(f"  [SKIP] {project_name}: 유휴 상태 ({idle_days}일째, 변경 시 자동 재개)")
 
         with open(idle_file, "w") as f:
             json.dump(state, f)
