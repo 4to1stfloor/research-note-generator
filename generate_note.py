@@ -615,7 +615,8 @@ class NoteGenerator:
                   f"서문 없이 바로 # 헤딩으로 시작하세요.")
         try:
             r = subprocess.run(
-                ["claude", "--print", "-p", prompt],
+                ["claude", "--print", "-p", "-"],
+                input=prompt,
                 capture_output=True, text=True, timeout=None
             )
             if r.returncode == 0 and r.stdout.strip():
@@ -705,15 +706,28 @@ class NoteGenerator:
             sys.exit(1)
 
     def _build_ai_context(self, changes: dict) -> str:
+        MAX_FILES = 50  # 파일 목록은 최대 50개만 표시
         parts = [f"Detection: {changes['method']}", f"Path: {changes['path']}", ""]
         if changes["new"]:
-            parts += [f"NEW ({len(changes['new'])}):" ] + [f"  + {f}" for f in changes["new"]] + [""]
+            shown = changes["new"][:MAX_FILES]
+            parts += [f"NEW ({len(changes['new'])}):" ] + [f"  + {f}" for f in shown]
+            if len(changes["new"]) > MAX_FILES:
+                parts.append(f"  ... 외 {len(changes['new']) - MAX_FILES}개 파일 생략")
+            parts.append("")
         if changes["modified"]:
-            parts += [f"MODIFIED ({len(changes['modified'])}):" ] + [f"  M {f}" for f in changes["modified"]] + [""]
+            shown = changes["modified"][:MAX_FILES]
+            parts += [f"MODIFIED ({len(changes['modified'])}):" ] + [f"  M {f}" for f in shown]
+            if len(changes["modified"]) > MAX_FILES:
+                parts.append(f"  ... 외 {len(changes['modified']) - MAX_FILES}개 파일 생략")
+            parts.append("")
         if changes["deleted"]:
-            parts += [f"DELETED ({len(changes['deleted'])}):" ] + [f"  - {f}" for f in changes["deleted"]] + [""]
+            shown = changes["deleted"][:MAX_FILES]
+            parts += [f"DELETED ({len(changes['deleted'])}):" ] + [f"  - {f}" for f in shown]
+            if len(changes["deleted"]) > MAX_FILES:
+                parts.append(f"  ... 외 {len(changes['deleted']) - MAX_FILES}개 파일 생략")
+            parts.append("")
         if changes.get("commits"):
-            parts += ["COMMITS:"] + [f"  {c}" for c in changes["commits"]] + [""]
+            parts += ["COMMITS:"] + [f"  {c}" for c in changes["commits"][:30]] + [""]
         if changes.get("diffs"):
             parts.append("DIFFS:")
             for fp, diff in list(changes["diffs"].items())[:10]:
